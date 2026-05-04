@@ -1,0 +1,14 @@
+---
+title: "Archive"
+subtitle: "All posts, newest first"
+listing:
+  contents: posts
+  type: table
+  sort: "date desc"
+  categories: true
+  filter-ui: true
+  sort-ui: true
+  fields: [date, title, subtitle, categories]
+page-layout: full
+title-block-banner: true
+---

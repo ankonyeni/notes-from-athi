@@ -1,0 +1,251 @@
+/* css styles */
+
+:root {
+  --blog-deep: #142133;
+  --blog-teal-dark: #056265;
+  --blog-teal: #0b877b;
+  --blog-aqua: #109984;
+  --blog-sun: #f79319;
+  --blog-orange: #f45f23;
+  --blog-coral: #e32d4f;
+  --blog-cream: #fff3cf;
+  --blog-code-bg: #102a36;
+  --blog-code-ink: #fff3cf;
+  --blog-code-muted: #b7c9c1;
+  --blog-code-blue: #84d5ff;
+  --blog-code-green: #83e7c2;
+  --blog-code-yellow: #ffc86b;
+  --blog-code-orange: #ff9b5c;
+  --blog-code-pink: #ff7a96;
+  --blog-surface: #fffdf4;
+  --blog-surface-strong: #fff3cf;
+  --blog-ink: #142133;
+  --blog-muted: #5f6f6f;
+  --blog-border: #eebf76;
+  --blog-accent: #056265;
+  --blog-accent-hot: #bd1f3b;
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(247, 147, 25, 0.07), transparent 34rem),
+    linear-gradient(180deg, #fffdf4 0%, #fff8e8 100%);
+  color: var(--blog-ink);
+}
+
+a {
+  color: var(--blog-accent);
+}
+
+a:hover {
+  color: var(--blog-accent-hot);
+}
+
+.navbar {
+  background: var(--blog-deep);
+  border-bottom: 3px solid var(--blog-sun);
+}
+
+.navbar-title,
+.navbar .nav-link,
+.navbar .navbar-nav .nav-link.active,
+.navbar .quarto-navbar-tools .quarto-navigation-tool {
+  color: var(--blog-cream);
+}
+
+.navbar .nav-link:hover,
+.navbar .quarto-navbar-tools .quarto-navigation-tool:hover {
+  color: var(--blog-sun);
+}
+
+.quarto-title-banner {
+  position: relative;
+  min-height: 26rem;
+  align-items: end;
+  isolation: isolate;
+  background-color: var(--blog-teal-dark);
+  background-position: center;
+  background-size: cover;
+  border-bottom: 4px solid var(--blog-sun);
+}
+
+.quarto-title-banner::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    linear-gradient(90deg, rgba(20, 33, 51, 0.78) 0%, rgba(20, 33, 51, 0.48) 48%, rgba(20, 33, 51, 0.14) 100%),
+    linear-gradient(0deg, rgba(20, 33, 51, 0.66) 0%, rgba(20, 33, 51, 0.04) 58%);
+}
+
+.quarto-title-banner .quarto-title {
+  position: relative;
+  padding-top: 7rem;
+  padding-bottom: 3rem;
+}
+
+.quarto-title-banner .title,
+.quarto-title-banner .subtitle,
+.quarto-title-banner .description {
+  color: #fff8e8;
+  text-shadow: 0 2px 16px rgba(20, 33, 51, 0.82);
+}
+
+.quarto-title-banner .quarto-categories .quarto-category {
+  background: rgba(255, 243, 207, 0.16);
+  border-color: rgba(255, 243, 207, 0.45);
+  color: var(--blog-cream);
+}
+
+.quarto-title-meta {
+  color: var(--blog-muted);
+}
+
+.page-columns .content {
+  background: rgba(255, 253, 244, 0.9);
+}
+
+.listing-category {
+  border-color: var(--blog-border);
+  color: var(--blog-teal-dark);
+  background: rgba(255, 248, 232, 0.88);
+}
+
+.quarto-listing .card {
+  border: 1px solid var(--blog-border);
+  border-radius: 8px;
+  background: rgba(255, 253, 244, 0.94);
+  box-shadow: 0 10px 28px rgba(20, 33, 51, 0.08);
+}
+
+.quarto-listing .card-title {
+  font-size: 1.05rem;
+}
+
+.quarto-listing .card-title a {
+  color: var(--blog-teal-dark);
+}
+
+.quarto-listing .card-title a:hover {
+  color: var(--blog-coral);
+}
+
+.quarto-listing .listing-description,
+.quarto-listing .card-text {
+  color: var(--blog-muted);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--blog-deep);
+}
+
+h2 {
+  border-bottom: 2px solid rgba(247, 147, 25, 0.42);
+  padding-bottom: 0.3rem;
+}
+
+code {
+  color: #a22735;
+  background-color: rgba(255, 243, 207, 0.72);
+  border-radius: 0.25rem;
+}
+
+pre.sourceCode,
+div.sourceCode {
+  background-color: var(--blog-code-bg);
+  border-color: var(--blog-teal);
+}
+
+pre.sourceCode code {
+  color: var(--blog-code-ink);
+  background: transparent;
+}
+
+div.sourceCode,
+div.sourceCode pre.sourceCode,
+pre > code.sourceCode > span,
+code.sourceCode > span,
+pre.sourceCode code span {
+  color: var(--blog-code-ink);
+}
+
+pre.sourceCode code span.an,
+pre.sourceCode code span.co,
+pre.sourceCode code span.cv,
+pre.sourceCode code span.do,
+pre.sourceCode code span.in,
+pre.sourceCode code span.op,
+pre.sourceCode code span.sc,
+pre.sourceCode code span.wa {
+  color: var(--blog-code-muted);
+}
+
+pre.sourceCode code span.at,
+pre.sourceCode code span.ch,
+pre.sourceCode code span.ss,
+pre.sourceCode code span.st,
+pre.sourceCode code span.vs {
+  color: var(--blog-code-green);
+}
+
+pre.sourceCode code span.cf,
+pre.sourceCode code span.kw,
+pre.sourceCode code span.ot {
+  color: var(--blog-code-yellow);
+  font-weight: 700;
+}
+
+pre.sourceCode code span.fu,
+pre.sourceCode code span.im {
+  color: var(--blog-code-blue);
+}
+
+pre.sourceCode code span.al,
+pre.sourceCode code span.bn,
+pre.sourceCode code span.dt,
+pre.sourceCode code span.dv,
+pre.sourceCode code span.er,
+pre.sourceCode code span.fl,
+pre.sourceCode code span.pp {
+  color: var(--blog-code-pink);
+}
+
+pre.sourceCode code span.cn {
+  color: var(--blog-code-orange);
+}
+
+pre.sourceCode code span.va {
+  color: var(--blog-code-ink);
+}
+
+.code-copy-button {
+  color: var(--blog-code-ink);
+}
+
+.code-copy-button:hover {
+  color: var(--blog-code-yellow);
+}
+
+.callout {
+  border-left-color: var(--blog-orange);
+  background-color: rgba(255, 243, 207, 0.5);
+}
+
+.callout.callout-style-default > .callout-header {
+  background-color: rgba(247, 147, 25, 0.16);
+}
+
+.pagination .page-link {
+  color: var(--blog-teal-dark);
+  background-color: var(--blog-surface);
+  border-color: var(--blog-border);
+}
+
+.pagination .page-link:hover {
+  color: var(--blog-coral);
+  background-color: var(--blog-surface-strong);
+}

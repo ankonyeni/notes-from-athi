@@ -1,0 +1,23 @@
+---
+title: Posts
+listing:
+  id: sample-listings
+  contents: posts
+  feed:
+    type: full
+    title: "Notes from Athi"
+    description: "Technical notes and essays from Athi."
+    categories: [R]
+  sort: "date desc"
+  type: grid
+  categories: true
+  sort-ui: [title]
+  filter-ui: true
+  fields: [image, date, title, subtitle, description, categories, author]
+page-layout: full
+title-block-banner: false
+---
+
+::: {#sample-listings}
+:::
+

@@ -1,0 +1,20 @@
+[
+  {
+    "listing": "/r.html",
+    "items": [
+      "/posts/bind-pipe/index.html"
+    ]
+  },
+  {
+    "listing": "/index.html",
+    "items": [
+      "/posts/bind-pipe/index.html"
+    ]
+  },
+  {
+    "listing": "/archive.html",
+    "items": [
+      "/posts/bind-pipe/index.html"
+    ]
+  }
+]

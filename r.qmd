@@ -1,0 +1,20 @@
+---
+title: "R"
+subtitle: "R posts, tutorials, and notes"
+listing:
+  contents: posts
+  type: grid
+  sort: "date desc"
+  categories: false
+  filter-ui: true
+  sort-ui: true
+  include:
+    categories: "R"
+  fields: [image, date, title, subtitle, description, author]
+page-layout: full
+title-block-banner: false
+---
+
+This page collects posts categorized as `R`.
+
+The R-only RSS feed is [index-r.xml](index-r.xml).

@@ -1,0 +1,20 @@
+---
+title: "About"
+image: profile.jpg
+about:
+  template: jolla
+  links:
+    - icon: github
+      text: GitHub
+      href: https://github.com/ankonyeni
+    - icon: rss
+      text: RSS
+      href: https://ankonyeni.github.io/notes-from-athi/index.xml
+
+---
+
+Notes from Athi is a place to write about the things I am learning, building, and thinking through.
+
+The main focus areas are R, Python, programming, computer science, data standards, digital transformation, clinical trials, statistics, and data visualization. Some posts will be technical tutorials, some will be short notes, and some will connect ideas across domains.
+
+The organizing principle is simple: make useful ideas easier to find later.

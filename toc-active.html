@@ -1,0 +1,45 @@
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const toc = document.querySelector('nav.toc-active[role="doc-toc"]');
+  if (!toc) return;
+
+  const links = Array.from(toc.querySelectorAll("a[data-scroll-target]"));
+  const entries = links
+    .map((link) => {
+      const target = link.getAttribute("data-scroll-target");
+      const id = target && target.startsWith("#") ? decodeURIComponent(target.slice(1)) : null;
+      const section = id ? document.getElementById(id) : null;
+      return section ? { link, section } : null;
+    })
+    .filter(Boolean);
+
+  if (!entries.length) return;
+
+  const updateActiveToc = () => {
+    const activationLine = 160;
+    let current = entries[0];
+
+    for (const entry of entries) {
+      if (entry.section.getBoundingClientRect().top <= activationLine) {
+        current = entry;
+      } else {
+        break;
+      }
+    }
+
+    links.forEach((link) => link.classList.toggle("active", link === current.link));
+
+    let parent = current.link.parentElement;
+    while (parent && parent !== toc) {
+      if (parent.tagName === "UL") {
+        parent.classList.remove("collapse");
+      }
+      parent = parent.parentElement;
+    }
+  };
+
+  updateActiveToc();
+  document.addEventListener("scroll", updateActiveToc, { passive: true });
+  window.addEventListener("resize", updateActiveToc);
+});
+</script>

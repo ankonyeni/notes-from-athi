@@ -1,0 +1,32 @@
+# options specified here will apply to all posts in this folder
+
+# freeze computational output
+# (see https://quarto.org/docs/projects/code-execution.html#freeze)
+freeze: auto
+
+# Enable banner style title blocks
+title-block-banner: true
+
+author: "Athenkosi Nkonyeni"
+
+toc: true
+page-layout: article
+
+# Suggested category vocabulary for the blog:
+# - R
+# - Python
+# - Programming
+# - Computer Science
+# - Data Standards
+# - Digital Transformation
+# - Clinical Trials
+# - Statistics
+# - Data Visualization
+# - Notes
+# - Projects
+
+# R-bloggers note:
+# Use the exact category "R" for posts intended for R-bloggers.
+# R-bloggers expects the submitted feed to contain only R-related posts,
+# so submit the generated category feed, usually /index-r.xml, rather than
+# the general mixed-topic site feed.
