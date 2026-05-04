@@ -17,7 +17,7 @@ The defining characteristic of this grammar is that almost everything is a **fun
 
 However, the famous adage that "**in R, everything is an object**" is only partially true. While most of R's power stems from objects and function calls, a handful of symbols exist as **pure grammar**. These are parsing instructions rather than functions. For instance, the right-assignment operator `->` cannot be called as a function; the parser immediately rewrites `1 -> x` as `` `<-`(x, 1) `` before execution. Because these constructs exist only as rules for the parser, they lack the object status that defines the rest of the language.
 
-```r
+``` r
 quote(1 -> x)
 #> x <- 1
 ```
@@ -26,7 +26,7 @@ quote(1 -> x)
 
 With R 4.1.0, the language officially introduced the native pipe operator `|>`. While R was late to this style compared to functional peers like **F#, Elixir,** and **OCaml**, its implementation was heavily influenced by the massive success of the `magrittr` package. For years, the `%>%` operator was the de facto standard, proving a deep appetite for linear, readable data transformations over deeply nested expressions:
 
-```r
+``` r
 # Nested
 head(transform(subset(mtcars, cyl == 6), kmpl = mpg * 0.425144))
 
@@ -38,19 +38,21 @@ mtcars |>
 ```
 
 ### How the Native Pipe Works
+
 Unlike `magrittr`, which operates as a function at runtime, the native pipe is a **compile-time transformation**. When the R parser encounters `x |> f(y)`, it does not run a pipe function. Instead, it physically rewrites the expression into `f(x, y)` before any code is executed. This lack of overhead makes the native pipe more efficient and ensures stack traces remain clean.
 
-```r
+``` r
 quote(iris |> head())
 #> head(iris)
 ```
 
 ### The Grammar of the Placeholder `_`
-Because the native pipe is pure grammar, it requires a syntactic way to handle cases where data should not go into the first argument. R 4.2.0 introduced the placeholder `_` for this purpose. 
+
+Because the native pipe is pure grammar, it requires a syntactic way to handle cases where data should not go into the first argument. R 4.2.0 introduced the placeholder `_` for this purpose.
 
 Like the pipe itself, the underscore is not an object; you cannot assign a value to `_` or use it in a standard calculation. It is a coordinate for the parser. When the parser sees `_`, it recognizes it as a signal to move the left-hand side into that specific named argument.
 
-```r
+``` r
 quote("Hello World" |> grepl('W', x = _))
 #> grepl("W", x = "Hello World")
 ```
@@ -67,9 +69,9 @@ While the native pipe `|>` is a powerful tool for streamlining code, its design 
 
 The primary limitations of `|>` stem from its rigidity as pure grammar:
 
-*   **The "Single Use" Placeholder Constraint:** In the native pipe, the underscore placeholder `_` can only be used **once** per call. If you need to reference the piped data multiple times—for example, to compare two columns or use the data in multiple arguments—the parser throws an error.
-*   **The "Named Argument" Requirement:** The placeholder `_` must be passed to a specifically named argument (e.g., `data = _`). You cannot use it as a positional argument, inside a nested expression, or within a mathematical operation without wrapping the entire step in a verbose anonymous function.
-*   **The "Function Call" Mandate:** The native pipe strictly expects the right-hand side to be a function call. It cannot pipe into a symbol or a raw expression. For example, `1:10 |> {_ * 1}` is syntactically invalid because the right-hand side is not a formal call.
+- **The "Single Use" Placeholder Constraint:** In the native pipe, the underscore placeholder `_` can only be used **once** per call. If you need to reference the piped data multiple times—for example, to compare two columns or use the data in multiple arguments—the parser throws an error.
+- **The "Named Argument" Requirement:** The placeholder `_` must be passed to a specifically named argument (e.g., `data = _`). You cannot use it as a positional argument, inside a nested expression, or within a mathematical operation without wrapping the entire step in a verbose anonymous function.
+- **The "Function Call" Mandate:** The native pipe strictly expects the right-hand side to be a function call. It cannot pipe into a symbol or a raw expression. For example, `1:10 |> {_ * 1}` is syntactically invalid because the right-hand side is not a formal call.
 
 ## Discovering the Hidden Grammar
 
@@ -86,76 +88,88 @@ The experimental pipe bind (`=>`) is designed to clear the structural hurdles in
 Instead of a "blind" injection into a single argument slot, the pipe bind allows you to **bind** the left-hand side to a temporary name (a variable) that exists only for the scope of the next expression.
 
 ### How the Pipe Bind Works
+
 Like the pipe operator, the pipe bind is implemented purely as grammar. When the parser encounters the pipe bind syntax `x |> y => expr`, it follows a specific transformation rule:
 
-1. It takes the object on the left (`x`).
-2. It creates a temporary, anonymous function where the name you provided (`y`) is the argument.
-3. It places the expression on the right (`expr`) as the body of that function.
-4. It immediately calls that function using `x` as the input.
+1.  It takes the object on the left (`x`).
+2.  It creates a temporary, anonymous function where the name you provided (`y`) is the argument.
+3.  It places the expression on the right (`expr`) as the body of that function.
+4.  It immediately calls that function using `x` as the input.
 
 Essentially, `x |> y => expr` is a syntactic shortcut for:
-```r
+
+``` r
 (function(y) expr)(x)
 ```
 
-
-::: {.callout-important}
+::: callout-important
 To try out this feature in R, you must first set the following environment variable:
-```r
+
+``` r
 Sys.setenv("_R_USE_PIPEBIND_" = "TRUE")
 ```
+
 Otherwise, you will encounter the following error when attempting to use the operator:
 
 `Error: '=>' is disabled; set '_R_USE_PIPEBIND_' envvar to a true value to enable it (<input>:1:11)`
 :::
+
 ### How it Overcomes the Pipe's Hurdles
 
 The pipe bind transforms the logic from structural rewriting to a temporary local scope:
 
-*   **Multiple Uses:** Since the data is bound to a name, you can reference it as many times as you want.
-    ```r
-    data <- c(12, 9, 11, 13, 10)
-    data |> x => data.frame(
-        value = x, 
-        diff = x - mean(x)
-    )
-    #>   value diff
-    #> 1    12    1
-    #> 2     9   -2
-    #> 3    11    0
-    #> 4    13    2
-    #> 5    10   -1
-    ```
-*   **Positional Freedom:** Because the right-hand side is treated as a scope where the data is simply a variable, you can use the bound data in any positional argument without the need to specify a parameter name (like `x = _`).
-    ```r
-    # No need for named arguments; the variable can be passed positionally
-    "hello" |> string => gsub("h", "j", string)
-    #> [1] "jello"
-    ```
-*   **Expression Freedom:** The pipe bind does not require a formal function call on the right-hand side. You can pipe directly into raw expressions or braced blocks, bypassing the need for a strict function structure.
-    ```r
-    data <- c(12, 9, 11, 13, 10, 14, 8, 12)
+- **Multiple Uses:** Since the data is bound to a name, you can reference it as many times as you want.
 
-    data |> x => {
-        x_sum <- sum(x)
-        n <- length(x)
-        x_sum/n
-    }
-    #> [1] 11.125
-    ```
-    Because the pipe bind binds the incoming lhs to a specific variable name, the rhs is no longer restricted to being a function call. It can be any valid R expression.
-    ```r
-    mtcars[mtcars$cyl == 9, ] |> df => {
-        if (nrow(df) > 0) {
-            lm(mpg ~ wt, data = df)
-        } else {
-            message("No records found to run the model.")
-        }
-    }
-    #> No records found to run the model.
-    ```
+  ``` r
+  data <- c(12, 9, 11, 13, 10)
+  data |> x => data.frame(
+      value = x, 
+      diff = x - mean(x)
+  )
+  #>   value diff
+  #> 1    12    1
+  #> 2     9   -2
+  #> 3    11    0
+  #> 4    13    2
+  #> 5    10   -1
+  ```
+
+- **Positional Freedom:** Because the right-hand side is treated as a scope where the data is simply a variable, you can use the bound data in any positional argument without the need to specify a parameter name (like `x = _`).
+
+  ``` r
+  # No need for named arguments; the variable can be passed positionally
+  "hello" |> string => gsub("h", "j", string)
+  #> [1] "jello"
+  ```
+
+- **Expression Freedom:** The pipe bind does not require a formal function call on the right-hand side. You can pipe directly into raw expressions or braced blocks, bypassing the need for a strict function structure.
+
+  ``` r
+  data <- c(12, 9, 11, 13, 10, 14, 8, 12)
+
+  data |> x => {
+      x_sum <- sum(x)
+      n <- length(x)
+      x_sum/n
+  }
+  #> [1] 11.125
+  ```
+
+  Because the pipe bind binds the incoming lhs to a specific variable name, the rhs is no longer restricted to being a function call. It can be any valid R expression.
+
+  ``` r
+  mtcars[mtcars$cyl == 9, ] |> df => {
+      if (nrow(df) > 0) {
+          lm(mpg ~ wt, data = df)
+      } else {
+          message("No records found to run the model.")
+      }
+  }
+  #> No records found to run the model.
+  ```
 
 ## Conclusion: A Glimpse into R's Future
+
 The `=>` operator is an interesting addition to R's syntax. While the native pipe `|>` streamlines linear code through simple rewriting, the pipe bind addresses the need for more flexible plumbing: referencing the same dataset multiple times and performing inline operations.
 
 However, it is important to remember that this is an experimental feature. It remains hidden behind an environment variable because it is still a "draft" within the language's source code. There is no guarantee that it will be promoted to a stable, production-ready release. If it does eventually graduate, both its syntax and its underlying behavior may change to ensure long-term compatibility with the rest of the language.
