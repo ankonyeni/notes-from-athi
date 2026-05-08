@@ -28,13 +28,7 @@ website:
       - icon: github
         href: https://github.com/ankonyeni/notes-from-athi
         aria-label: GitHub repository
-  page-footer:
-    left: "© 2026 Athenkosi Nkonyeni"
-    right:
-      - text: R-bloggers
-        href: https://www.r-bloggers.com
-      - text: GitHub
-        href: https://github.com/ankonyeni/notes-from-athi
+
 format:
   html:
     theme:
