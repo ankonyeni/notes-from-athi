@@ -28,7 +28,6 @@ website:
       - icon: github
         href: https://github.com/ankonyeni/notes-from-athi
         aria-label: GitHub repository
-
 format:
   html:
     theme:
