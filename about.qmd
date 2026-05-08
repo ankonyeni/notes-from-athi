@@ -4,6 +4,9 @@ image: profile.jpg
 about:
   template: jolla
   links:
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/athenkosi-nkonyeni-1482a8154
     - icon: github
       text: GitHub
       href: https://github.com/ankonyeni
@@ -12,9 +15,8 @@ about:
       href: https://ankonyeni.github.io/notes-from-athi/index.xml
 
 ---
+Hi, I’m Athenkosi Nkonyeni.
 
-Notes from Athi is a place to write about the things I am learning, building, and thinking through.
+I write about things I'm interested in, especially around programming, data standards, and digital transformation.
 
-The main focus areas are R, Python, programming, computer science, data standards, digital transformation, clinical trials, statistics, and data visualization. Some posts will be technical tutorials, some will be short notes, and some will connect ideas across domains.
-
-The organizing principle is simple: make useful ideas easier to find later.
+This blog is an outlet for what I'm thinking about and learning. I use it to document ideas, experiments, and lessons I want to remember and build on over time.

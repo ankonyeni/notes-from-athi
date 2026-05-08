@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Athenkosi Nkonyeni">
+<meta name="dcterms.date" content="2026-05-06">
+<meta name="description" content="A deep dive into R’s exact, partial, and positional argument matching system">
+
+<title>How R Matches Function Arguments – Notes from Athi</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-fde6028973a8af2afb1d77be65601ea1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>
+
+      .quarto-title-block .quarto-title-banner h1,
+      .quarto-title-block .quarto-title-banner h2,
+      .quarto-title-block .quarto-title-banner h3,
+      .quarto-title-block .quarto-title-banner h4,
+      .quarto-title-block .quarto-title-banner h5,
+      .quarto-title-block .quarto-title-banner h6
+      {
+        color: #fff8e8;
+      }
+
+      .quarto-title-block .quarto-title-banner {
+        color: #fff8e8;
+background-image: url(image.png);
+background-size: cover;
+      }
+</style>
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="How R Matches Function Arguments – Notes from Athi">
+<meta property="og:description" content="A deep dive into R’s exact, partial, and positional argument matching system">
+<meta property="og:image" content="https://ankonyeni.github.io/notes-from-athi/posts/argument-matching/image.png">
+<meta property="og:site_name" content="Notes from Athi">
+<meta property="og:image:height" content="941">
+<meta property="og:image:width" content="1672">
+<meta name="twitter:title" content="How R Matches Function Arguments – Notes from Athi">
+<meta name="twitter:description" content="A deep dive into R’s exact, partial, and positional argument matching system">
+<meta name="twitter:image" content="https://ankonyeni.github.io/notes-from-athi/posts/argument-matching/image.png">
+<meta name="twitter:image-height" content="941">
+<meta name="twitter:image-width" content="1672">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Notes from Athi</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../archive.html"> 
+<span class="menu-text">Archive</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/ankonyeni/notes-from-athi"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img" aria-label="RSS feed">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">How R Matches Function Arguments</h1>
+            <p class="subtitle lead">Beyond positional and named arguments</p>
+                  <div>
+        <div class="description">
+          A deep dive into R’s exact, partial, and positional argument matching system
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">R</div>
+                <div class="quarto-category">Programming</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Athenkosi Nkonyeni </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">May 6, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#formal-arguments-and-supplied-arguments" id="toc-formal-arguments-and-supplied-arguments" class="nav-link" data-scroll-target="#formal-arguments-and-supplied-arguments">Formal arguments and supplied arguments</a></li>
+  <li><a href="#rs-three-stage-argument-matching-system" id="toc-rs-three-stage-argument-matching-system" class="nav-link" data-scroll-target="#rs-three-stage-argument-matching-system">R’s three-stage argument matching system</a></li>
+  <li><a href="#exact-matching-on-tagsnames" id="toc-exact-matching-on-tagsnames" class="nav-link" data-scroll-target="#exact-matching-on-tagsnames">1. Exact matching on tags/names</a>
+  <ul class="collapse">
+  <li><a href="#duplicate-exact-matches-are-errors" id="toc-duplicate-exact-matches-are-errors" class="nav-link" data-scroll-target="#duplicate-exact-matches-are-errors">Duplicate exact matches are errors</a></li>
+  </ul></li>
+  <li><a href="#partial-matching-on-tagsnames" id="toc-partial-matching-on-tagsnames" class="nav-link" data-scroll-target="#partial-matching-on-tagsnames">2. Partial matching on tags/names</a>
+  <ul class="collapse">
+  <li><a href="#ambiguous-partial-matches-are-errors" id="toc-ambiguous-partial-matches-are-errors" class="nav-link" data-scroll-target="#ambiguous-partial-matches-are-errors">Ambiguous partial matches are errors</a></li>
+  </ul></li>
+  <li><a href="#positional-matching" id="toc-positional-matching" class="nav-link" data-scroll-target="#positional-matching">3. Positional matching</a>
+  <ul class="collapse">
+  <li><a href="#positional-matching-after-name-based-matching" id="toc-positional-matching-after-name-based-matching" class="nav-link" data-scroll-target="#positional-matching-after-name-based-matching">Positional matching after name-based matching</a></li>
+  </ul></li>
+  <li><a href="#the-special-role-of-..." id="toc-the-special-role-of-..." class="nav-link" data-scroll-target="#the-special-role-of-...">The special role of <code>...</code></a>
+  <ul class="collapse">
+  <li><a href="#and-partial-matching" id="toc-and-partial-matching" class="nav-link" data-scroll-target="#and-partial-matching"><code>...</code> and partial matching</a></li>
+  <li><a href="#why-partial-matching-stops-at-..." id="toc-why-partial-matching-stops-at-..." class="nav-link" data-scroll-target="#why-partial-matching-stops-at-...">Why partial matching stops at <code>...</code></a></li>
+  </ul></li>
+  <li><a href="#what-makes-rs-argument-matching-system-unique" id="toc-what-makes-rs-argument-matching-system-unique" class="nav-link" data-scroll-target="#what-makes-rs-argument-matching-system-unique">What makes R’s argument matching system unique?</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Most programming languages have rules for how values supplied in a function call are connected to the parameters in the function definition.</p>
+<p>In many languages, the two most common styles are <strong>positional arguments</strong> and <strong>named arguments</strong>.</p>
+<p>A <strong>positional argument</strong> is matched according to its position in the function call:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, the first value is matched to the first formal argument, the second value is matched to the second formal argument, and so on.</p>
+<p>A <strong>named argument</strong> is matched by name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">x =</span> <span class="dv">1</span>, <span class="at">y =</span> <span class="dv">2</span>, <span class="at">z =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, the argument names explicitly identify which formal argument should receive each value. The order matters less because the names carry the meaning.</p>
+<p>Different programming languages make different design choices around these ideas. Some languages support only positional arguments. Some support both positional and named arguments. Some allow the two styles to be mixed, but only under specific rules. Some languages even allow function authors to control which arguments may be supplied positionally and which must be supplied by name.</p>
+<p>R takes a different approach.</p>
+<p>Instead of treating argument passing as a simple choice between “positional parameters” and “keyword parameters”, R uses an <strong>argument matching system</strong>.</p>
+<p>This system allows R to decide how supplied arguments should be connected to formal arguments using a sequence of matching rules. That design gives R a very flexible function-calling style, but it also means that the exact rules matter.</p>
+<p>Understanding those rules is important because small changes in how arguments are named or ordered can change how a call is interpreted. In interactive use, this flexibility can be convenient. In scripts, packages, and production code, the same flexibility can become a source of confusion or fragility.</p>
+</section>
+<section id="formal-arguments-and-supplied-arguments" class="level2">
+<h2 class="anchored" data-anchor-id="formal-arguments-and-supplied-arguments">Formal arguments and supplied arguments</h2>
+<p>Before looking at R’s matching rules, it helps to define two terms: <strong>formal arguments</strong> and <strong>supplied arguments</strong>.</p>
+<p>Consider this function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y) {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  x <span class="sc">+</span> y</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The arguments listed in the function definition are called <strong>formal arguments</strong>: <code>x</code>, <code>y</code></p>
+<p>They define the interface of the function. In other words, they describe the inputs that the function is prepared to receive.</p>
+<p>When we call the function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">x =</span> <span class="dv">1</span>, <span class="at">y =</span> <span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>the values provided in the function call are the <strong>supplied arguments</strong>:</p>
+<ul>
+<li><code>x = 1</code></li>
+<li><code>y = 2</code></li>
+</ul>
+<p>R’s job is to match each supplied argument to the correct formal argument.</p>
+<p>This example is intentionally simple: each supplied argument has the same name as a formal argument. But R’s full argument matching system is more general than this. A supplied argument can be matched by exact name, by partial name, or by position, depending on the call and the function definition.</p>
+</section>
+<section id="rs-three-stage-argument-matching-system" class="level2">
+<h2 class="anchored" data-anchor-id="rs-three-stage-argument-matching-system">R’s three-stage argument matching system</h2>
+<p>R matches arguments in three main stages:</p>
+<ol type="1">
+<li><strong>Exact matching on tags/names</strong></li>
+<li><strong>Partial matching on tags/names</strong></li>
+<li><strong>Positional matching</strong></li>
+</ol>
+<p>This order is important.</p>
+<p>R does not simply read arguments from left to right and bind each value immediately. Instead, it applies these stages in sequence. First, it handles exact name matches. Then it considers partial name matches. Finally, it uses positional matching for arguments that still remain unmatched.</p>
+<p>This staged process is what gives R its flexible calling style. It also explains why some function calls behave in ways that may not be obvious if you expect arguments to be matched only by position or only by exact name.</p>
+</section>
+<section id="exact-matching-on-tagsnames" class="level2">
+<h2 class="anchored" data-anchor-id="exact-matching-on-tagsnames">1. Exact matching on tags/names</h2>
+<p>The first stage of R’s argument matching system is <strong>exact matching</strong>.</p>
+<p>For each <strong>named supplied argument</strong>, R searches the function’s formal argument list for a formal argument with exactly the same name.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y) {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">y =</span> <span class="dv">2</span>, <span class="at">x =</span> <span class="dv">1</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(x = 1, y = 2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>In this call, the supplied arguments are not written in the same order as the formal arguments:</p>
+<ul>
+<li>Formal arguments: <code>x</code>, <code>y</code></li>
+<li>Supplied arguments: <code>y</code>, <code>x</code></li>
+</ul>
+<p>However, the call is still valid because both supplied arguments are named exactly:</p>
+<ul>
+<li><code>y</code> -&gt; <code>y</code></li>
+<li><code>x</code> -&gt; <code>x</code></li>
+</ul>
+<p>Because the names are exact, the order of the supplied arguments does not matter. R can match each supplied argument directly to the corresponding formal argument.</p>
+<p>This is one of the main benefits of named arguments: they make function calls more readable and less dependent on position.</p>
+<section id="duplicate-exact-matches-are-errors" class="level3">
+<h3 class="anchored" data-anchor-id="duplicate-exact-matches-are-errors">Duplicate exact matches are errors</h3>
+<p>A formal argument can only receive one value.</p>
+<p>R does not allow the same formal argument to be matched by multiple supplied arguments.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y) {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">x =</span> <span class="dv">1</span>, <span class="at">x =</span> <span class="dv">2</span>, <span class="at">y =</span> <span class="dv">3</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Error in f(x = 1, x = 2, y = 3) : </span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   formal argument "x" matched by multiple actual arguments</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This call is invalid because <code>x</code> is supplied twice:</p>
+<ul>
+<li><code>x = 1</code> -&gt; <code>x</code></li>
+<li><code>x = 2</code> -&gt; <code>x</code></li>
+</ul>
+<p>Both supplied arguments are trying to bind to the same formal argument. Since a single formal argument cannot be matched more than once, R raises an error.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule for exact matching is:</p>
+<p>A named supplied argument is matched to a formal argument when the names are identical, but each formal argument can only be matched once.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="partial-matching-on-tagsnames" class="level2">
+<h2 class="anchored" data-anchor-id="partial-matching-on-tagsnames">2. Partial matching on tags/names</h2>
+<p>After exact matching, R applies <strong>partial matching</strong> to the remaining named supplied arguments.</p>
+<p>This is one of the most distinctive features of R’s argument matching system. A supplied argument name does not always need to match a formal argument name in full. Instead, it can match the <strong>beginning</strong> of a formal argument name, as long as the match is unambiguous.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, beta) {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">al =</span> <span class="dv">1</span>, <span class="at">be =</span> <span class="dv">2</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, beta = 2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, R is able to match the supplied argument names to the formal argument names because each partial name points to only one possible candidate:</p>
+<ul>
+<li><code>al</code> -&gt; <code>alpha</code></li>
+<li><code>be</code> -&gt; <code>beta</code></li>
+</ul>
+<p>This can be convenient, especially during interactive use at the console, where users may type shortened argument names to save time.</p>
+<p>However, partial matching is also one of the most controversial parts of R’s argument matching system. It makes function calls more flexible, but it can also make code more fragile. A partial name that works today may become ambiguous later if the function gains a new formal argument with a similar name.</p>
+<p>For example, suppose a function initially has only one argument beginning with <code>al</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, beta) {</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">al =</span> <span class="dv">1</span>, <span class="at">beta =</span> <span class="dv">2</span>)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, beta = 2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Later, the function is changed to include another argument that also begins with <code>al</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, alphabet, beta) {</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">al =</span> <span class="dv">1</span>, <span class="at">beta =</span> <span class="dv">2</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Error in f(al = 1, beta = 2) : </span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   argument 1 matches multiple formal arguments</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The same call is now ambiguous because <code>al</code> could refer to either <code>alpha</code> or <code>alphabet</code>.</p>
+<p>This is why partial matching is useful for interactive exploration, but full argument names are usually safer in production code, package code, and reproducible scripts.</p>
+<section id="ambiguous-partial-matches-are-errors" class="level3">
+<h3 class="anchored" data-anchor-id="ambiguous-partial-matches-are-errors">Ambiguous partial matches are errors</h3>
+<p>Partial matching only works when the partial name uniquely identifies one formal argument.</p>
+<p>Consider this function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, alphabet, beta) {</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Now consider this call:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">alph =</span> <span class="dv">1</span>, <span class="at">beta =</span> <span class="dv">2</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Error in f(alph = 1, beta = 2) : </span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   argument 1 matches multiple formal arguments</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The supplied argument name <code>alph</code> could refer to either:</p>
+<ul>
+<li><code>alpha</code></li>
+<li><code>alphabet</code></li>
+</ul>
+<p>So R cannot safely decide which formal argument should receive the value <code>1</code>. That is an error.</p>
+<p>The general rule is:</p>
+<ul>
+<li>Partial matching is allowed only when the partial argument name matches one remaining formal argument unambiguously.</li>
+</ul>
+<p>This “remaining” part is important. R does not simply look at all formal arguments at once and ask whether the partial name is unique. Argument matching happens in stages.</p>
+<p>R first performs exact matching on named arguments. After exact matches have been resolved, those formal arguments are no longer available for partial matching.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, alphabet, beta) {</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">alpha =</span> <span class="dv">1</span>, <span class="at">al =</span> <span class="dv">4</span>, <span class="at">beta =</span> <span class="dv">2</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, alphabet = 4, beta = 2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>At first glance, <code>al</code> may look ambiguous because both <code>alpha</code> and <code>alphabet</code> begin with <code>al</code>.</p>
+<p>However, the call works because <code>alpha = 1</code> is matched exactly first. Once <code>alpha</code> has been matched, it is removed from the pool of candidates. That leaves <code>alphabet</code> as the only remaining formal argument that can match <code>al</code>.</p>
+<p>So the matching process is effectively:</p>
+<ol type="1">
+<li><code>alpha = 1</code> is matched exactly to the formal argument <code>alpha</code>.</li>
+<li><code>beta = 2</code> is matched exactly to the formal argument <code>beta</code>.</li>
+<li><code>al = 4</code> is then considered for partial matching.</li>
+<li>Since <code>alpha</code> has already been matched, the only remaining formal argument starting with <code>al</code> is <code>alphabet</code>.</li>
+<li>Therefore, <code>al = 4</code> is matched to <code>alphabet</code>.</li>
+</ol>
+<p>This is one of the reasons R’s argument matching can feel flexible, but also slightly surprising. The meaning of a partially named argument can depend on which other arguments have already been matched exactly.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule for partial matching is:</p>
+<p>A named supplied argument may be matched to the beginning of a formal argument name, but only if that partial name uniquely identifies one remaining unmatched formal argument.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="positional-matching" class="level2">
+<h2 class="anchored" data-anchor-id="positional-matching">3. Positional matching</h2>
+<p>After exact matching and partial matching are complete, R performs <strong>positional matching</strong>.</p>
+<p>At this stage, any remaining <strong>unnamed supplied arguments</strong> are matched to the remaining <strong>unmatched formal arguments</strong> in order.</p>
+<p>The simplest example is a call where all supplied arguments are unnamed:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, beta, gamma) {</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, beta = 2, gamma = 3)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, there are no named arguments to match exactly or partially, so R falls back to position:</p>
+<ul>
+<li><code>1</code> -&gt; <code>alpha</code></li>
+<li><code>2</code> -&gt; <code>beta</code></li>
+<li><code>3</code> -&gt; <code>gamma</code></li>
+</ul>
+<p>This is ordinary positional matching: the first supplied argument goes to the first formal argument, the second supplied argument goes to the second formal argument, and so on.</p>
+<section id="positional-matching-after-name-based-matching" class="level3">
+<h3 class="anchored" data-anchor-id="positional-matching-after-name-based-matching">Positional matching after name-based matching</h3>
+<p>R’s positional matching becomes more interesting when named and unnamed arguments are mixed.</p>
+<p>Because exact and partial matching happen first, positional matching only deals with the arguments that are still unmatched.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, beta, gamma) {</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">gamma =</span> <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">2</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, beta = 2, gamma = 3)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>R does not process this call strictly from left to right. Instead, it applies the matching rules in stages.</p>
+<p>First, exact matching is performed:</p>
+<ul>
+<li><code>gamma = 3</code> -&gt; <code>gamma</code></li>
+</ul>
+<p>After exact matching, the remaining unmatched formal arguments are:</p>
+<ul>
+<li><code>alpha</code></li>
+<li><code>beta</code></li>
+</ul>
+<p>The remaining supplied arguments are unnamed:</p>
+<ul>
+<li><code>1</code></li>
+<li><code>2</code></li>
+</ul>
+<p>Now positional matching applies:</p>
+<ul>
+<li><code>1</code> -&gt; <code>alpha</code></li>
+<li><code>2</code> -&gt; <code>beta</code></li>
+</ul>
+<p>This is why R allows named arguments to appear before unnamed positional arguments.</p>
+<p>In many other languages, this style would be invalid because positional arguments must come before named arguments. But R’s matching system is not a simple left-to-right binding rule.</p>
+<p>R first resolves name-based matches, and only then uses position for the remaining unmatched arguments.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule for positional matching is:</p>
+<p>After exact and partial matching are complete, remaining unnamed supplied arguments are matched by position to remaining unmatched formal arguments.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="the-special-role-of-..." class="level2">
+<h2 class="anchored" data-anchor-id="the-special-role-of-...">The special role of <code>...</code></h2>
+<p>The argument <code>...</code> has a special role in R’s argument matching system.</p>
+<p>It allows a function to accept additional supplied arguments beyond the ordinary formal arguments listed in the function definition.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, ...) {</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">alpha =</span> alpha, <span class="at">dots =</span> <span class="fu">list</span>(...))</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="at">gamma =</span> <span class="dv">3</span>)</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; $alpha</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; $dots</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; $dots[[1]]</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; $dots$gamma</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 3</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Conceptually, this call is matched as follows:</p>
+<ul>
+<li><code>alpha = 1</code></li>
+<li><code>... = list(2, gamma = 3)</code></li>
+</ul>
+<p>The first unnamed supplied argument is matched positionally to <code>alpha</code>. The remaining supplied arguments are collected by <code>...</code>.</p>
+<p>A key point is that <code>...</code> can collect both unnamed and named supplied arguments:</p>
+<ul>
+<li><code>2</code> -&gt; collected by <code>...</code></li>
+<li><code>gamma = 3</code> -&gt; collected by <code>...</code></li>
+</ul>
+<p>So <code>...</code> is not limited to positional arguments. It can absorb any supplied arguments that have not already been matched to ordinary formal arguments.</p>
+<p>This makes <code>...</code> especially useful for wrapper functions.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>my_plot <span class="ot">&lt;-</span> <span class="cf">function</span>(x, y, ...) {</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(x, y, ...)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The wrapper function defines only three formal arguments: <code>x</code>, <code>y</code>, and <code>...</code>.</p>
+<p>But users can still pass additional arguments intended for <code>plot()</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">my_plot</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">y =</span> (<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>)<span class="sc">^</span><span class="dv">2</span>,</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">col =</span> <span class="st">"red"</span>,</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">pch =</span> <span class="dv">19</span>,</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">main =</span> <span class="st">"My Plot"</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, <code>x</code> and <code>y</code> are matched to the ordinary formal arguments of <code>my_plot()</code>, while <code>col</code>, <code>pch</code>, and <code>main</code> are collected by <code>...</code> and forwarded to <code>plot()</code>.</p>
+<p>Conceptually:</p>
+<ul>
+<li><code>x = 1:10</code></li>
+<li><code>y = (1:10)^2</code></li>
+<li><code>... = list(col = "red", pch = 19, main = "My Plot")</code></li>
+</ul>
+<p>This pattern is central to R programming. It allows one function to expose its own interface while still passing additional arguments to another function.</p>
+<section id="and-partial-matching" class="level3">
+<h3 class="anchored" data-anchor-id="and-partial-matching"><code>...</code> and partial matching</h3>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>There is an important rule involving <code>...</code> and partial matching:</p>
+<p>If a function has <code>...</code>, partial matching is only applied to formal arguments that appear before <code>...</code>.</p>
+</div>
+</div>
+<p>Consider this function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(alpha, ..., beta) {</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, <code>alpha</code> appears before <code>...</code>, while <code>beta</code> appears after <code>...</code>.</p>
+<p>Partial matching can apply to <code>alpha</code>, because it appears before <code>...</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="at">al =</span> <span class="dv">1</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>But partial matching does not apply to <code>beta</code>, because <code>beta</code> appears after <code>...</code>.</p>
+<p>So this call does not partially match <code>be</code> to <code>beta</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="dv">1</span>, <span class="at">be =</span> <span class="dv">2</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, be = 2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Instead, <code>be = 2</code> is collected by <code>...</code>.</p>
+<p>To match <code>beta</code>, the argument should be supplied using its exact name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(<span class="dv">1</span>, <span class="at">beta =</span> <span class="dv">2</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(alpha = 1, beta = 2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This rule matters because arguments after <code>...</code> are commonly used as control arguments that must be named explicitly.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(data, ..., <span class="at">validate =</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list</span>(</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> data,</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">dots =</span> <span class="fu">list</span>(...),</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">validate =</span> validate</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A call like this is clear:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(my_data, <span class="at">option1 =</span> <span class="st">"A"</span>, <span class="at">option2 =</span> <span class="st">"B"</span>, <span class="at">validate =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Conceptually:</p>
+<ul>
+<li><code>data = my_data</code></li>
+<li><code>... = list(option1 = "A", option2 = "B")</code></li>
+<li><code>validate = FALSE</code></li>
+</ul>
+<p>The arguments <code>option1</code> and <code>option2</code> are collected by <code>...</code>, while <code>validate</code> is matched exactly by name.</p>
+<p>But this call would not partially match <code>val</code> to <code>validate</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">f</span>(my_data, <span class="at">option1 =</span> <span class="st">"A"</span>, <span class="at">val =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Instead, <code>val = FALSE</code> would be collected by <code>...</code>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule is:</p>
+<p>Formal arguments after <code>...</code> should be supplied by exact name. They are not matched positionally, and they are not matched by partial name.</p>
+</div>
+</div>
+<p>This behavior is intentional. It allows <code>...</code> to collect flexible additional arguments, while still letting function authors define later arguments that must be supplied explicitly and unambiguously.</p>
+</section>
+<section id="why-partial-matching-stops-at-..." class="level3">
+<h3 class="anchored" data-anchor-id="why-partial-matching-stops-at-...">Why partial matching stops at <code>...</code></h3>
+<p>Partial matching is not performed on formal arguments after <code>...</code> because <code>...</code> is often used to <strong>forward arguments to another function</strong>.</p>
+<p>If R allowed partial matching on formal arguments after <code>...</code>, the outer function could accidentally “steal” arguments that were meant for the inner function.</p>
+<p>This is easiest to understand with a wrapper function.</p>
+<p>Suppose we write a small helper that calculates a mean for one selected trimester. The wrapper has its own argument called <code>trimester</code>, while the inner function, <code>mean()</code>, has an argument called <code>trim</code>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>mean_for_trimester <span class="ot">&lt;-</span> <span class="cf">function</span>(x, trimester_group, ..., <span class="at">trimester =</span> <span class="dv">1</span>) {</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  x_selected <span class="ot">&lt;-</span> x[trimester_group <span class="sc">==</span> trimester]</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mean</span>(x_selected, ...)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, the intended design is:</p>
+<ul>
+<li><code>x</code> -&gt; used by <code>mean_for_trimester()</code></li>
+<li><code>trimester_group</code> -&gt; used by <code>mean_for_trimester()</code></li>
+<li><code>...</code> -&gt; forwarded to <code>mean()</code></li>
+<li><code>trimester</code> -&gt; used by <code>mean_for_trimester()</code> to select a group</li>
+</ul>
+<p>The important naming relationship is this:</p>
+<ul>
+<li><code>trim</code> is an argument of <code>mean()</code></li>
+<li><code>trimester</code> is an argument of <code>mean_for_trimester()</code></li>
+<li><code>trim</code> is a prefix of <code>trimester</code></li>
+</ul>
+<p>Now suppose the user calls:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mean_for_trimester</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> <span class="fu">c</span>(<span class="dv">10</span>, <span class="dv">12</span>, <span class="dv">15</span>, <span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">100</span>),</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">trimester_group =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">trim =</span> <span class="fl">0.1</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The intended meaning is that <code>trim = 0.1</code> should be forwarded to <code>mean()</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(x_selected, <span class="at">trim =</span> <span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Conceptually, the outer call should be matched like this:</p>
+<ul>
+<li><code>x = c(10, 12, 15, 20, 30, 100)</code></li>
+<li><code>trimester_group = c(1, 1, 1, 1, 1, 1)</code></li>
+<li><code>... = list(trim = 0.1)</code></li>
+<li><code>trimester = 1</code></li>
+</ul>
+<p>Now imagine if R allowed partial matching on formal arguments after <code>...</code>.</p>
+<p>Since <code>trimester</code> begins with <code>trim</code>, the outer function could treat <code>trim = 0.1</code> as a partial match for <code>trimester</code>.</p>
+<p>Conceptually, the dangerous behavior would be:</p>
+<ul>
+<li><code>x = c(10, 12, 15, 20, 30, 100)</code></li>
+<li><code>trimester_group = c(1, 1, 1, 1, 1, 1)</code></li>
+<li><code>trimester = 0.1</code></li>
+<li><code>... = empty</code></li>
+</ul>
+<p>That would be a serious problem.</p>
+<p>The argument <code>trim = 0.1</code> was intended for <code>mean()</code>, where it is an exact match to the formal argument <code>trim</code>. But the outer function would consume it first as a partial match to <code>trimester</code>, before <code>mean()</code> ever received it.</p>
+<p>The wrapper would then call:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(x_selected)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>instead of:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(x_selected, <span class="at">trim =</span> <span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That changes the meaning of the computation.</p>
+<p>This is especially dangerous because both arguments are numeric. The mistaken match would not necessarily produce an obvious type error. The code might still run, but with different semantics from what the caller intended.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>That is the key reason partial matching stops at <code>...</code>:</p>
+<p>Arguments after <code>...</code> are not partially matched because the outer function should not be allowed to steal arguments that may be intended for a function called inside it.</p>
+</div>
+</div>
+<p>In actual R behavior, this stealing does <strong>not</strong> happen.</p>
+<p>Because <code>trimester</code> appears after <code>...</code>, it must be matched by exact name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>mean_for_trimester <span class="ot">&lt;-</span> <span class="cf">function</span>(x, trimester_group, ..., <span class="at">trimester =</span> <span class="dv">1</span>) {</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">match.call</span>()</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="fu">mean_for_trimester</span>(</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> <span class="fu">c</span>(<span class="dv">10</span>, <span class="dv">12</span>, <span class="dv">15</span>, <span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">100</span>),</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">trimester_group =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">trim =</span> <span class="fl">0.1</span></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here, <code>trim = 0.1</code> is not partially matched to <code>trimester</code>. It remains available to be collected by <code>...</code>.</p>
+<p>To match <code>trimester</code>, the caller must use the exact name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mean_for_trimester</span>(</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> <span class="fu">c</span>(<span class="dv">10</span>, <span class="dv">12</span>, <span class="dv">15</span>, <span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">100</span>),</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">trimester_group =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">trimester =</span> <span class="dv">1</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This creates a clean separation:</p>
+<ul>
+<li>arguments before <code>...</code> may be matched exactly, partially, or positionally;</li>
+<li><code>...</code> collects remaining supplied arguments;</li>
+<li>arguments after <code>...</code> must be matched exactly.</li>
+</ul>
+<p>So <code>...</code> acts as a boundary between two argument-matching contexts:</p>
+<ul>
+<li><code>mean_for_trimester()</code> matches its own ordinary arguments;</li>
+<li><code>...</code> carries unmatched arguments forward;</li>
+<li><code>mean()</code> matches those forwarded arguments later.</li>
+</ul>
+<p>Without this rule, wrapper functions would be much less predictable. An argument that is an exact match for the inner function could be captured as a partial match by the outer function. That would make <code>...</code> unsafe as a forwarding mechanism.</p>
+</section>
+</section>
+<section id="what-makes-rs-argument-matching-system-unique" class="level2">
+<h2 class="anchored" data-anchor-id="what-makes-rs-argument-matching-system-unique">What makes R’s argument matching system unique?</h2>
+<p>R’s argument matching system is unusual because it combines several matching strategies into one process.</p>
+<p>In many languages, argument passing is mostly governed by a strict distinction between positional arguments and named arguments. R is more flexible. A supplied argument can be matched by exact name, by partial name, or by position, and these rules are applied in a specific order.</p>
+<p>This means R does not simply bind arguments from left to right. Instead, it first resolves the clearest matches, then handles less explicit matches, and only then falls back to position.</p>
+<p>This design gives R a very expressive calling style. For interactive work, it can feel convenient and natural. Users can name important arguments, omit names for obvious arguments, and sometimes use shortened argument names.</p>
+<p>For example, R functions often support calls that mix named and unnamed arguments in ways that would be invalid in many other languages. This is not because R has no rules, but because its rules are different. R uses a staged matching system rather than a simple left-to-right binding system.</p>
+<p>The flexibility is powerful, but it also comes with trade-offs.</p>
+<p>Partial matching, in particular, can make code more fragile. A shortened argument name may work today but become ambiguous later if the function gains a new formal argument with a similar name. This is why partial matching is often convenient at the console but less desirable in production code.</p>
+<p>The <code>...</code> argument adds another layer to the system. It allows functions to collect and forward arguments, which is central to many R programming patterns. Wrapper functions, plotting functions, modelling functions, and generic interfaces often rely on <code>...</code> to pass arguments from one function to another.</p>
+<p>At the same time, <code>...</code> requires careful matching rules. In particular, formal arguments after <code>...</code> must be matched exactly. This prevents the outer function from accidentally capturing arguments that were intended to be forwarded to an inner function.</p>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>R’s argument matching system is one of the language’s most flexible features.</p>
+<p>At first, function calls in R may look simple: we supply values, and R passes those values into the function. But underneath that simple surface, R applies a structured matching process.</p>
+<p>The core rules are:</p>
+<ol type="1">
+<li>named arguments are first matched exactly;</li>
+<li>remaining named arguments may then be matched partially;</li>
+<li>remaining unnamed arguments are finally matched by position.</li>
+</ol>
+<p>The order matters. Exact matches remove formal arguments from further consideration. Partial matches only apply to the remaining unmatched formal arguments. Positional matching only happens after name-based matching is complete.</p>
+<p>The special argument <code>...</code> adds another important dimension. It allows functions to collect additional arguments and forward them to other functions. This makes wrapper functions possible, but it also explains why arguments after <code>...</code> must be supplied by exact name. Without that rule, an outer function could accidentally capture arguments meant for an inner function.</p>
+<p>For interactive work, partial argument names can be convenient. But for scripts, packages, production code, and reproducible analyses, full argument names are usually safer and clearer.</p>
+<p>A good rule of thumb is:</p>
+<ul>
+<li>use exact names for important arguments;</li>
+<li>avoid relying on partial matching in production code;</li>
+<li>be careful when designing functions that use <code>...</code>;</li>
+<li>place control arguments after <code>...</code> when you want them to be named explicitly;</li>
+<li>and remember that R matches arguments in stages, not simply from left to right.</li>
+</ul>
+<p>Understanding this system helps explain many things that otherwise feel surprising in R. It also helps you write clearer function calls, design safer function interfaces, and reason more accurately about how R code is evaluated.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>R Core Team. <em>R Language Definition</em>. “4.3.2 Argument matching”. <a href="https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Argument-matching">https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Argument-matching</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const toc = document.querySelector('nav.toc-active[role="doc-toc"]');
+  if (!toc) return;
+
+  const links = Array.from(toc.querySelectorAll("a[data-scroll-target]"));
+  const entries = links
+    .map((link) => {
+      const target = link.getAttribute("data-scroll-target");
+      const id = target && target.startsWith("#") ? decodeURIComponent(target.slice(1)) : null;
+      const section = id ? document.getElementById(id) : null;
+      return section ? { link, section } : null;
+    })
+    .filter(Boolean);
+
+  if (!entries.length) return;
+
+  const updateActiveToc = () => {
+    const activationLine = 160;
+    let current = entries[0];
+
+    for (const entry of entries) {
+      if (entry.section.getBoundingClientRect().top <= activationLine) {
+        current = entry;
+      } else {
+        break;
+      }
+    }
+
+    links.forEach((link) => link.classList.toggle("active", link === current.link));
+
+    let parent = current.link.parentElement;
+    while (parent && parent !== toc) {
+      if (parent.tagName === "UL") {
+        parent.classList.remove("collapse");
+      }
+      parent = parent.parentElement;
+    }
+  };
+
+  updateActiveToc();
+  document.addEventListener("scroll", updateActiveToc, { passive: true });
+  window.addEventListener("resize", updateActiveToc);
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/ankonyeni\.github\.io\/notes-from-athi");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>© 2026 Athenkosi Nkonyeni</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../index.xml">
+<p>RSS</p>
+</a>
+  </li>  
+    <li class="nav-item">
+    <a class="nav-link" href="https://github.com/ankonyeni/notes-from-athi">
+<p>GitHub</p>
+</a>
+  </li>  
+</ul>
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

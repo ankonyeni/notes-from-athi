@@ -1,0 +1,688 @@
+---
+title: "How R Matches Function Arguments"
+subtitle: "Beyond positional and named arguments"
+description: "A deep dive into R's exact, partial, and positional argument matching system"
+date: "2026-05-06"
+categories: [R, Programming]
+image: "image.png"
+title-block-banner: "image.png"
+title-block-banner-color: "#fff8e8"
+---
+
+## Introduction
+
+Most programming languages have rules for how values supplied in a function call are connected to the parameters in the function definition.
+
+In many languages, the two most common styles are **positional arguments** and **named arguments**.
+
+A **positional argument** is matched according to its position in the function call:
+
+```r
+f(1, 2, 3)
+```
+
+Here, the first value is matched to the first formal argument, the second value is matched to the second formal argument, and so on.
+
+A **named argument** is matched by name:
+
+```r
+f(x = 1, y = 2, z = 3)
+```
+
+Here, the argument names explicitly identify which formal argument should receive each value. The order matters less because the names carry the meaning.
+
+Different programming languages make different design choices around these ideas. Some languages support only positional arguments. Some support both positional and named arguments. Some allow the two styles to be mixed, but only under specific rules. Some languages even allow function authors to control which arguments may be supplied positionally and which must be supplied by name.
+
+R takes a different approach.
+
+Instead of treating argument passing as a simple choice between “positional parameters” and “keyword parameters”, R uses an **argument matching system**.
+
+This system allows R to decide how supplied arguments should be connected to formal arguments using a sequence of matching rules. That design gives R a very flexible function-calling style, but it also means that the exact rules matter.
+
+Understanding those rules is important because small changes in how arguments are named or ordered can change how a call is interpreted. In interactive use, this flexibility can be convenient. In scripts, packages, and production code, the same flexibility can become a source of confusion or fragility.
+
+## Formal arguments and supplied arguments
+
+Before looking at R’s matching rules, it helps to define two terms: **formal arguments** and **supplied arguments**.
+
+Consider this function:
+
+```r
+f <- function(x, y) {
+  x + y
+}
+```
+
+The arguments listed in the function definition are called **formal arguments**: `x`, `y`
+
+They define the interface of the function. In other words, they describe the inputs that the function is prepared to receive.
+
+When we call the function:
+
+```r
+f(x = 1, y = 2)
+```
+
+the values provided in the function call are the **supplied arguments**:
+
+-  `x = 1`
+-  `y = 2`
+
+R’s job is to match each supplied argument to the correct formal argument.
+
+This example is intentionally simple: each supplied argument has the same name as a formal argument. But R’s full argument matching system is more general than this. A supplied argument can be matched by exact name, by partial name, or by position, depending on the call and the function definition.
+
+## R’s three-stage argument matching system
+
+R matches arguments in three main stages:
+
+1. **Exact matching on tags/names**
+2. **Partial matching on tags/names**
+3. **Positional matching**
+
+This order is important.
+
+R does not simply read arguments from left to right and bind each value immediately. Instead, it applies these stages in sequence. First, it handles exact name matches. Then it considers partial name matches. Finally, it uses positional matching for arguments that still remain unmatched.
+
+This staged process is what gives R its flexible calling style. It also explains why some function calls behave in ways that may not be obvious if you expect arguments to be matched only by position or only by exact name.
+
+## 1. Exact matching on tags/names
+
+The first stage of R’s argument matching system is **exact matching**.
+
+For each **named supplied argument**, R searches the function’s formal argument list for a formal argument with exactly the same name.
+
+For example:
+
+```r
+f <- function(x, y) {
+  match.call()
+}
+
+f(y = 2, x = 1)
+#> f(x = 1, y = 2)
+```
+
+In this call, the supplied arguments are not written in the same order as the formal arguments:
+
+* Formal arguments: `x`, `y`
+* Supplied arguments: `y`, `x`
+
+However, the call is still valid because both supplied arguments are named exactly:
+
+* `y` -> `y`
+* `x` -> `x`
+
+Because the names are exact, the order of the supplied arguments does not matter. R can match each supplied argument directly to the corresponding formal argument.
+
+This is one of the main benefits of named arguments: they make function calls more readable and less dependent on position.
+
+### Duplicate exact matches are errors
+
+A formal argument can only receive one value.
+
+R does not allow the same formal argument to be matched by multiple supplied arguments.
+
+For example:
+
+```r
+f <- function(x, y) {
+  match.call()
+}
+
+f(x = 1, x = 2, y = 3)
+#> Error in f(x = 1, x = 2, y = 3) : 
+#>   formal argument "x" matched by multiple actual arguments
+```
+
+This call is invalid because `x` is supplied twice:
+
+* `x = 1` -> `x`
+* `x = 2` -> `x`
+
+Both supplied arguments are trying to bind to the same formal argument. Since a single formal argument cannot be matched more than once, R raises an error.
+
+::: {.callout-note}
+The key rule for exact matching is:
+
+A named supplied argument is matched to a formal argument when the names are identical, but each formal argument can only be matched once.
+:::
+
+## 2. Partial matching on tags/names
+
+After exact matching, R applies **partial matching** to the remaining named supplied arguments.
+
+This is one of the most distinctive features of R’s argument matching system. A supplied argument name does not always need to match a formal argument name in full. Instead, it can match the **beginning** of a formal argument name, as long as the match is unambiguous.
+
+For example:
+
+```r
+f <- function(alpha, beta) {
+  match.call()
+}
+
+f(al = 1, be = 2)
+#> f(alpha = 1, beta = 2)
+```
+
+Here, R is able to match the supplied argument names to the formal argument names because each partial name points to only one possible candidate:
+
+* `al` -> `alpha`
+* `be` -> `beta`
+
+This can be convenient, especially during interactive use at the console, where users may type shortened argument names to save time.
+
+However, partial matching is also one of the most controversial parts of R’s argument matching system. It makes function calls more flexible, but it can also make code more fragile. A partial name that works today may become ambiguous later if the function gains a new formal argument with a similar name.
+
+For example, suppose a function initially has only one argument beginning with `al`:
+
+```r
+f <- function(alpha, beta) {
+  match.call()
+}
+
+f(al = 1, beta = 2)
+#> f(alpha = 1, beta = 2)
+```
+
+Later, the function is changed to include another argument that also begins with `al`:
+
+```r
+f <- function(alpha, alphabet, beta) {
+  match.call()
+}
+
+f(al = 1, beta = 2)
+#> Error in f(al = 1, beta = 2) : 
+#>   argument 1 matches multiple formal arguments
+```
+
+The same call is now ambiguous because `al` could refer to either `alpha` or `alphabet`.
+
+This is why partial matching is useful for interactive exploration, but full argument names are usually safer in production code, package code, and reproducible scripts.
+
+### Ambiguous partial matches are errors
+
+Partial matching only works when the partial name uniquely identifies one formal argument.
+
+Consider this function:
+
+```r
+f <- function(alpha, alphabet, beta) {
+  match.call()
+}
+```
+
+Now consider this call:
+
+```r
+f(alph = 1, beta = 2)
+#> Error in f(alph = 1, beta = 2) : 
+#>   argument 1 matches multiple formal arguments
+```
+
+The supplied argument name `alph` could refer to either:
+
+* `alpha`
+* `alphabet`
+
+So R cannot safely decide which formal argument should receive the value `1`. That is an error.
+
+The general rule is:
+
+* Partial matching is allowed only when the partial argument name matches one remaining formal argument unambiguously.
+
+This “remaining” part is important. R does not simply look at all formal arguments at once and ask whether the partial name is unique. Argument matching happens in stages.
+
+R first performs exact matching on named arguments. After exact matches have been resolved, those formal arguments are no longer available for partial matching.
+
+For example:
+
+```r
+f <- function(alpha, alphabet, beta) {
+  match.call()
+}
+
+f(alpha = 1, al = 4, beta = 2)
+#> f(alpha = 1, alphabet = 4, beta = 2)
+```
+
+At first glance, `al` may look ambiguous because both `alpha` and `alphabet` begin with `al`.
+
+However, the call works because `alpha = 1` is matched exactly first. Once `alpha` has been matched, it is removed from the pool of candidates. That leaves `alphabet` as the only remaining formal argument that can match `al`.
+
+So the matching process is effectively:
+
+1. `alpha = 1` is matched exactly to the formal argument `alpha`.
+2. `beta = 2` is matched exactly to the formal argument `beta`.
+3. `al = 4` is then considered for partial matching.
+4. Since `alpha` has already been matched, the only remaining formal argument starting with `al` is `alphabet`.
+5. Therefore, `al = 4` is matched to `alphabet`.
+
+This is one of the reasons R’s argument matching can feel flexible, but also slightly surprising. The meaning of a partially named argument can depend on which other arguments have already been matched exactly.
+
+::: {.callout-note}
+The key rule for partial matching is:
+
+A named supplied argument may be matched to the beginning of a formal argument name, but only if that partial name uniquely identifies one remaining unmatched formal argument.
+:::
+
+## 3. Positional matching
+
+After exact matching and partial matching are complete, R performs **positional matching**.
+
+At this stage, any remaining **unnamed supplied arguments** are matched to the remaining **unmatched formal arguments** in order.
+
+The simplest example is a call where all supplied arguments are unnamed:
+
+```r
+f <- function(alpha, beta, gamma) {
+  match.call()
+}
+
+f(1, 2, 3)
+#> f(alpha = 1, beta = 2, gamma = 3)
+```
+
+Here, there are no named arguments to match exactly or partially, so R falls back to position:
+
+* `1` -> `alpha`
+* `2` -> `beta`
+* `3` -> `gamma`
+
+This is ordinary positional matching: the first supplied argument goes to the first formal argument, the second supplied argument goes to the second formal argument, and so on.
+
+### Positional matching after name-based matching
+
+R’s positional matching becomes more interesting when named and unnamed arguments are mixed.
+
+Because exact and partial matching happen first, positional matching only deals with the arguments that are still unmatched.
+
+For example:
+
+```r
+f <- function(alpha, beta, gamma) {
+  match.call()
+}
+
+f(gamma = 3, 1, 2)
+#> f(alpha = 1, beta = 2, gamma = 3)
+```
+
+R does not process this call strictly from left to right. Instead, it applies the matching rules in stages.
+
+First, exact matching is performed:
+
+* `gamma = 3` -> `gamma`
+
+After exact matching, the remaining unmatched formal arguments are:
+
+* `alpha`
+* `beta`
+
+The remaining supplied arguments are unnamed:
+
+* `1`
+* `2`
+
+Now positional matching applies:
+
+* `1` -> `alpha`
+* `2` -> `beta`
+
+This is why R allows named arguments to appear before unnamed positional arguments.
+
+In many other languages, this style would be invalid because positional arguments must come before named arguments. But R’s matching system is not a simple left-to-right binding rule.
+
+R first resolves name-based matches, and only then uses position for the remaining unmatched arguments.
+
+::: {.callout-note}
+The key rule for positional matching is:
+
+After exact and partial matching are complete, remaining unnamed supplied arguments are matched by position to remaining unmatched formal arguments.
+:::
+
+## The special role of `...`
+
+The argument `...` has a special role in R’s argument matching system.
+
+It allows a function to accept additional supplied arguments beyond the ordinary formal arguments listed in the function definition.
+
+For example:
+
+```r
+f <- function(alpha, ...) {
+  list(alpha = alpha, dots = list(...))
+}
+
+f(1, 2, gamma = 3)
+#> $alpha
+#> [1] 1
+#>
+#> $dots
+#> $dots[[1]]
+#> [1] 2
+#>
+#> $dots$gamma
+#> [1] 3
+```
+
+Conceptually, this call is matched as follows:
+
+* `alpha = 1`
+* `... = list(2, gamma = 3)`
+
+The first unnamed supplied argument is matched positionally to `alpha`. The remaining supplied arguments are collected by `...`.
+
+A key point is that `...` can collect both unnamed and named supplied arguments:
+
+* `2` -> collected by `...`
+* `gamma = 3` -> collected by `...`
+
+So `...` is not limited to positional arguments. It can absorb any supplied arguments that have not already been matched to ordinary formal arguments.
+
+This makes `...` especially useful for wrapper functions.
+
+For example:
+
+```r
+my_plot <- function(x, y, ...) {
+  plot(x, y, ...)
+}
+```
+
+The wrapper function defines only three formal arguments: `x`, `y`, and `...`.
+
+But users can still pass additional arguments intended for `plot()`:
+
+```r
+my_plot(
+  x = 1:10,
+  y = (1:10)^2,
+  col = "red",
+  pch = 19,
+  main = "My Plot"
+)
+```
+
+Here, `x` and `y` are matched to the ordinary formal arguments of `my_plot()`, while `col`, `pch`, and `main` are collected by `...` and forwarded to `plot()`.
+
+Conceptually:
+
+* `x = 1:10`
+* `y = (1:10)^2`
+* `... = list(col = "red", pch = 19, main = "My Plot")`
+
+This pattern is central to R programming. It allows one function to expose its own interface while still passing additional arguments to another function.
+
+### `...` and partial matching
+
+::: {.callout-note}
+There is an important rule involving `...` and partial matching:
+
+If a function has `...`, partial matching is only applied to formal arguments that appear before `...`.
+:::
+
+Consider this function:
+
+```r
+f <- function(alpha, ..., beta) {
+  match.call()
+}
+```
+
+Here, `alpha` appears before `...`, while `beta` appears after `...`.
+
+Partial matching can apply to `alpha`, because it appears before `...`:
+
+```r
+f(al = 1)
+#> f(alpha = 1)
+```
+
+But partial matching does not apply to `beta`, because `beta` appears after `...`.
+
+So this call does not partially match `be` to `beta`:
+
+```r
+f(1, be = 2)
+#> f(alpha = 1, be = 2)
+```
+
+Instead, `be = 2` is collected by `...`.
+
+To match `beta`, the argument should be supplied using its exact name:
+
+```r
+f(1, beta = 2)
+#> f(alpha = 1, beta = 2)
+```
+
+This rule matters because arguments after `...` are commonly used as control arguments that must be named explicitly.
+
+For example:
+
+```r
+f <- function(data, ..., validate = TRUE) {
+  list(
+    data = data,
+    dots = list(...),
+    validate = validate
+  )
+}
+```
+
+A call like this is clear:
+
+```r
+f(my_data, option1 = "A", option2 = "B", validate = FALSE)
+```
+
+Conceptually:
+
+* `data = my_data`
+* `... = list(option1 = "A", option2 = "B")`
+* `validate = FALSE`
+
+The arguments `option1` and `option2` are collected by `...`, while `validate` is matched exactly by name.
+
+But this call would not partially match `val` to `validate`:
+
+```r
+f(my_data, option1 = "A", val = FALSE)
+```
+
+Instead, `val = FALSE` would be collected by `...`.
+
+::: {.callout-note}
+The key rule is:
+
+Formal arguments after `...` should be supplied by exact name. They are not matched positionally, and they are not matched by partial name.
+:::
+
+This behavior is intentional. It allows `...` to collect flexible additional arguments, while still letting function authors define later arguments that must be supplied explicitly and unambiguously.
+
+### Why partial matching stops at `...`
+
+Partial matching is not performed on formal arguments after `...` because `...` is often used to **forward arguments to another function**.
+
+If R allowed partial matching on formal arguments after `...`, the outer function could accidentally “steal” arguments that were meant for the inner function.
+
+This is easiest to understand with a wrapper function.
+
+Suppose we write a small helper that calculates a mean for one selected trimester. The wrapper has its own argument called `trimester`, while the inner function, `mean()`, has an argument called `trim`.
+
+```r
+mean_for_trimester <- function(x, trimester_group, ..., trimester = 1) {
+  x_selected <- x[trimester_group == trimester]
+
+  mean(x_selected, ...)
+}
+```
+
+Here, the intended design is:
+
+* `x` -> used by `mean_for_trimester()`
+* `trimester_group` -> used by `mean_for_trimester()`
+* `...` -> forwarded to `mean()`
+* `trimester` -> used by `mean_for_trimester()` to select a group
+
+The important naming relationship is this:
+
+* `trim` is an argument of `mean()`
+* `trimester` is an argument of `mean_for_trimester()`
+* `trim` is a prefix of `trimester`
+
+Now suppose the user calls:
+
+```r
+mean_for_trimester(
+  x = c(10, 12, 15, 20, 30, 100),
+  trimester_group = c(1, 1, 1, 1, 1, 1),
+  trim = 0.1
+)
+```
+
+The intended meaning is that `trim = 0.1` should be forwarded to `mean()`:
+
+```r
+mean(x_selected, trim = 0.1)
+```
+
+Conceptually, the outer call should be matched like this:
+
+* `x = c(10, 12, 15, 20, 30, 100)`
+* `trimester_group = c(1, 1, 1, 1, 1, 1)`
+* `... = list(trim = 0.1)`
+* `trimester = 1`
+
+Now imagine if R allowed partial matching on formal arguments after `...`.
+
+Since `trimester` begins with `trim`, the outer function could treat `trim = 0.1` as a partial match for `trimester`.
+
+Conceptually, the dangerous behavior would be:
+
+* `x = c(10, 12, 15, 20, 30, 100)`
+* `trimester_group = c(1, 1, 1, 1, 1, 1)`
+* `trimester = 0.1`
+* `... = empty`
+
+That would be a serious problem.
+
+The argument `trim = 0.1` was intended for `mean()`, where it is an exact match to the formal argument `trim`. But the outer function would consume it first as a partial match to `trimester`, before `mean()` ever received it.
+
+The wrapper would then call:
+
+```r
+mean(x_selected)
+```
+
+instead of:
+
+```r
+mean(x_selected, trim = 0.1)
+```
+
+That changes the meaning of the computation.
+
+This is especially dangerous because both arguments are numeric. The mistaken match would not necessarily produce an obvious type error. The code might still run, but with different semantics from what the caller intended.
+
+::: {.callout-note}
+That is the key reason partial matching stops at `...`:
+
+Arguments after `...` are not partially matched because the outer function should not be allowed to steal arguments that may be intended for a function called inside it.
+:::
+
+In actual R behavior, this stealing does **not** happen.
+
+Because `trimester` appears after `...`, it must be matched by exact name:
+
+```r
+mean_for_trimester <- function(x, trimester_group, ..., trimester = 1) {
+  match.call()
+}
+
+mean_for_trimester(
+  x = c(10, 12, 15, 20, 30, 100),
+  trimester_group = c(1, 1, 1, 1, 1, 1),
+  trim = 0.1
+)
+```
+
+Here, `trim = 0.1` is not partially matched to `trimester`. It remains available to be collected by `...`.
+
+To match `trimester`, the caller must use the exact name:
+
+```r
+mean_for_trimester(
+  x = c(10, 12, 15, 20, 30, 100),
+  trimester_group = c(1, 1, 1, 1, 1, 1),
+  trimester = 1
+)
+```
+
+This creates a clean separation:
+
+* arguments before `...` may be matched exactly, partially, or positionally;
+* `...` collects remaining supplied arguments;
+* arguments after `...` must be matched exactly.
+
+So `...` acts as a boundary between two argument-matching contexts:
+
+* `mean_for_trimester()` matches its own ordinary arguments;
+* `...` carries unmatched arguments forward;
+* `mean()` matches those forwarded arguments later.
+
+Without this rule, wrapper functions would be much less predictable. An argument that is an exact match for the inner function could be captured as a partial match by the outer function. That would make `...` unsafe as a forwarding mechanism.
+
+## What makes R’s argument matching system unique?
+
+R’s argument matching system is unusual because it combines several matching strategies into one process.
+
+In many languages, argument passing is mostly governed by a strict distinction between positional arguments and named arguments. R is more flexible. A supplied argument can be matched by exact name, by partial name, or by position, and these rules are applied in a specific order.
+
+This means R does not simply bind arguments from left to right. Instead, it first resolves the clearest matches, then handles less explicit matches, and only then falls back to position.
+
+This design gives R a very expressive calling style. For interactive work, it can feel convenient and natural. Users can name important arguments, omit names for obvious arguments, and sometimes use shortened argument names.
+
+For example, R functions often support calls that mix named and unnamed arguments in ways that would be invalid in many other languages. This is not because R has no rules, but because its rules are different. R uses a staged matching system rather than a simple left-to-right binding system.
+
+The flexibility is powerful, but it also comes with trade-offs.
+
+Partial matching, in particular, can make code more fragile. A shortened argument name may work today but become ambiguous later if the function gains a new formal argument with a similar name. This is why partial matching is often convenient at the console but less desirable in production code.
+
+The `...` argument adds another layer to the system. It allows functions to collect and forward arguments, which is central to many R programming patterns. Wrapper functions, plotting functions, modelling functions, and generic interfaces often rely on `...` to pass arguments from one function to another.
+
+At the same time, `...` requires careful matching rules. In particular, formal arguments after `...` must be matched exactly. This prevents the outer function from accidentally capturing arguments that were intended to be forwarded to an inner function.
+
+## Conclusion
+
+R’s argument matching system is one of the language’s most flexible features.
+
+At first, function calls in R may look simple: we supply values, and R passes those values into the function. But underneath that simple surface, R applies a structured matching process.
+
+The core rules are:
+
+1. named arguments are first matched exactly;
+2. remaining named arguments may then be matched partially;
+3. remaining unnamed arguments are finally matched by position.
+
+The order matters. Exact matches remove formal arguments from further consideration. Partial matches only apply to the remaining unmatched formal arguments. Positional matching only happens after name-based matching is complete.
+
+The special argument `...` adds another important dimension. It allows functions to collect additional arguments and forward them to other functions. This makes wrapper functions possible, but it also explains why arguments after `...` must be supplied by exact name. Without that rule, an outer function could accidentally capture arguments meant for an inner function.
+
+For interactive work, partial argument names can be convenient. But for scripts, packages, production code, and reproducible analyses, full argument names are usually safer and clearer.
+
+A good rule of thumb is:
+
+* use exact names for important arguments;
+* avoid relying on partial matching in production code;
+* be careful when designing functions that use `...`;
+* place control arguments after `...` when you want them to be named explicitly;
+* and remember that R matches arguments in stages, not simply from left to right.
+
+Understanding this system helps explain many things that otherwise feel surprising in R. It also helps you write clearer function calls, design safer function interfaces, and reason more accurately about how R code is evaluated.
+
+## References
+
+* R Core Team. *R Language Definition*. "4.3.2 Argument matching". [https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Argument-matching](https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Argument-matching)

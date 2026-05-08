@@ -1,19 +1,15 @@
 [
   {
-    "listing": "/r.html",
-    "items": [
-      "/posts/bind-pipe/index.html"
-    ]
-  },
-  {
     "listing": "/index.html",
     "items": [
+      "/posts/argument-matching/index.html",
       "/posts/bind-pipe/index.html"
     ]
   },
   {
     "listing": "/archive.html",
     "items": [
+      "/posts/argument-matching/index.html",
       "/posts/bind-pipe/index.html"
     ]
   }

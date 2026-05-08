@@ -1,9 +1,15 @@
 project:
   type: website
   output-dir: docs
+  render:
+    - "*.qmd"
+    - "!r.qmd"
 
 execute:
-  freeze: auto
+  echo: true      # show code
+  eval: false     # do not run code globally
+  warning: false
+  message: false
 
 website:
   description: "Notes on R, Python, programming, data standards, digital transformation, clinical trials, statistics, data visualization, and related ideas."
@@ -14,8 +20,6 @@ website:
     left:
       - text: "Home"
         href: index.qmd
-      - text: "R"
-        href: r.qmd
       - text: "Archive"
         href: archive.qmd
       - text: "About"

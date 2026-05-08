@@ -10,7 +10,1093 @@
 <atom:link href="https://ankonyeni.github.io/notes-from-athi/index.xml" rel="self" type="application/rss+xml"/>
 <description>Technical notes and essays from Athi.</description>
 <generator>quarto-1.9.37</generator>
-<lastBuildDate>Thu, 30 Apr 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 05 May 2026 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>How R Matches Function Arguments</title>
+  <dc:creator>Athenkosi Nkonyeni</dc:creator>
+  <link>https://ankonyeni.github.io/notes-from-athi/posts/argument-matching/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Most programming languages have rules for how values supplied in a function call are connected to the parameters in the function definition.</p>
+<p>In many languages, the two most common styles are <strong>positional arguments</strong> and <strong>named arguments</strong>.</p>
+<p>A <strong>positional argument</strong> is matched according to its position in the function call:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span></code></pre></div></div>
+<p>Here, the first value is matched to the first formal argument, the second value is matched to the second formal argument, and so on.</p>
+<p>A <strong>named argument</strong> is matched by name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">z =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span></code></pre></div></div>
+<p>Here, the argument names explicitly identify which formal argument should receive each value. The order matters less because the names carry the meaning.</p>
+<p>Different programming languages make different design choices around these ideas. Some languages support only positional arguments. Some support both positional and named arguments. Some allow the two styles to be mixed, but only under specific rules. Some languages even allow function authors to control which arguments may be supplied positionally and which must be supplied by name.</p>
+<p>R takes a different approach.</p>
+<p>Instead of treating argument passing as a simple choice between “positional parameters” and “keyword parameters”, R uses an <strong>argument matching system</strong>.</p>
+<p>This system allows R to decide how supplied arguments should be connected to formal arguments using a sequence of matching rules. That design gives R a very flexible function-calling style, but it also means that the exact rules matter.</p>
+<p>Understanding those rules is important because small changes in how arguments are named or ordered can change how a call is interpreted. In interactive use, this flexibility can be convenient. In scripts, packages, and production code, the same flexibility can become a source of confusion or fragility.</p>
+</section>
+<section id="formal-arguments-and-supplied-arguments" class="level2">
+<h2 class="anchored" data-anchor-id="formal-arguments-and-supplied-arguments">Formal arguments and supplied arguments</h2>
+<p>Before looking at R’s matching rules, it helps to define two terms: <strong>formal arguments</strong> and <strong>supplied arguments</strong>.</p>
+<p>Consider this function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(x, y) {</span>
+<span id="cb3-2">  x <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> y</span>
+<span id="cb3-3">}</span></code></pre></div></div>
+<p>The arguments listed in the function definition are called <strong>formal arguments</strong>: <code>x</code>, <code>y</code></p>
+<p>They define the interface of the function. In other words, they describe the inputs that the function is prepared to receive.</p>
+<p>When we call the function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span></code></pre></div></div>
+<p>the values provided in the function call are the <strong>supplied arguments</strong>:</p>
+<ul>
+<li><code>x = 1</code></li>
+<li><code>y = 2</code></li>
+</ul>
+<p>R’s job is to match each supplied argument to the correct formal argument.</p>
+<p>This example is intentionally simple: each supplied argument has the same name as a formal argument. But R’s full argument matching system is more general than this. A supplied argument can be matched by exact name, by partial name, or by position, depending on the call and the function definition.</p>
+</section>
+<section id="rs-three-stage-argument-matching-system" class="level2">
+<h2 class="anchored" data-anchor-id="rs-three-stage-argument-matching-system">R’s three-stage argument matching system</h2>
+<p>R matches arguments in three main stages:</p>
+<ol type="1">
+<li><strong>Exact matching on tags/names</strong></li>
+<li><strong>Partial matching on tags/names</strong></li>
+<li><strong>Positional matching</strong></li>
+</ol>
+<p>This order is important.</p>
+<p>R does not simply read arguments from left to right and bind each value immediately. Instead, it applies these stages in sequence. First, it handles exact name matches. Then it considers partial name matches. Finally, it uses positional matching for arguments that still remain unmatched.</p>
+<p>This staged process is what gives R its flexible calling style. It also explains why some function calls behave in ways that may not be obvious if you expect arguments to be matched only by position or only by exact name.</p>
+</section>
+<section id="exact-matching-on-tagsnames" class="level2">
+<h2 class="anchored" data-anchor-id="exact-matching-on-tagsnames">1. Exact matching on tags/names</h2>
+<p>The first stage of R’s argument matching system is <strong>exact matching</strong>.</p>
+<p>For each <strong>named supplied argument</strong>, R searches the function’s formal argument list for a formal argument with exactly the same name.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(x, y) {</span>
+<span id="cb5-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb5-3">}</span>
+<span id="cb5-4"></span>
+<span id="cb5-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb5-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(x = 1, y = 2)</span></span></code></pre></div></div>
+<p>In this call, the supplied arguments are not written in the same order as the formal arguments:</p>
+<ul>
+<li>Formal arguments: <code>x</code>, <code>y</code></li>
+<li>Supplied arguments: <code>y</code>, <code>x</code></li>
+</ul>
+<p>However, the call is still valid because both supplied arguments are named exactly:</p>
+<ul>
+<li><code>y</code> -&gt; <code>y</code></li>
+<li><code>x</code> -&gt; <code>x</code></li>
+</ul>
+<p>Because the names are exact, the order of the supplied arguments does not matter. R can match each supplied argument directly to the corresponding formal argument.</p>
+<p>This is one of the main benefits of named arguments: they make function calls more readable and less dependent on position.</p>
+<section id="duplicate-exact-matches-are-errors" class="level3">
+<h3 class="anchored" data-anchor-id="duplicate-exact-matches-are-errors">Duplicate exact matches are errors</h3>
+<p>A formal argument can only receive one value.</p>
+<p>R does not allow the same formal argument to be matched by multiple supplied arguments.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(x, y) {</span>
+<span id="cb6-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb6-3">}</span>
+<span id="cb6-4"></span>
+<span id="cb6-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span>
+<span id="cb6-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; Error in f(x = 1, x = 2, y = 3) : </span></span>
+<span id="cb6-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt;   formal argument "x" matched by multiple actual arguments</span></span></code></pre></div></div>
+<p>This call is invalid because <code>x</code> is supplied twice:</p>
+<ul>
+<li><code>x = 1</code> -&gt; <code>x</code></li>
+<li><code>x = 2</code> -&gt; <code>x</code></li>
+</ul>
+<p>Both supplied arguments are trying to bind to the same formal argument. Since a single formal argument cannot be matched more than once, R raises an error.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule for exact matching is:</p>
+<p>A named supplied argument is matched to a formal argument when the names are identical, but each formal argument can only be matched once.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="partial-matching-on-tagsnames" class="level2">
+<h2 class="anchored" data-anchor-id="partial-matching-on-tagsnames">2. Partial matching on tags/names</h2>
+<p>After exact matching, R applies <strong>partial matching</strong> to the remaining named supplied arguments.</p>
+<p>This is one of the most distinctive features of R’s argument matching system. A supplied argument name does not always need to match a formal argument name in full. Instead, it can match the <strong>beginning</strong> of a formal argument name, as long as the match is unambiguous.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, beta) {</span>
+<span id="cb7-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb7-3">}</span>
+<span id="cb7-4"></span>
+<span id="cb7-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">al =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">be =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb7-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, beta = 2)</span></span></code></pre></div></div>
+<p>Here, R is able to match the supplied argument names to the formal argument names because each partial name points to only one possible candidate:</p>
+<ul>
+<li><code>al</code> -&gt; <code>alpha</code></li>
+<li><code>be</code> -&gt; <code>beta</code></li>
+</ul>
+<p>This can be convenient, especially during interactive use at the console, where users may type shortened argument names to save time.</p>
+<p>However, partial matching is also one of the most controversial parts of R’s argument matching system. It makes function calls more flexible, but it can also make code more fragile. A partial name that works today may become ambiguous later if the function gains a new formal argument with a similar name.</p>
+<p>For example, suppose a function initially has only one argument beginning with <code>al</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, beta) {</span>
+<span id="cb8-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb8-3">}</span>
+<span id="cb8-4"></span>
+<span id="cb8-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">al =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">beta =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb8-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, beta = 2)</span></span></code></pre></div></div>
+<p>Later, the function is changed to include another argument that also begins with <code>al</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, alphabet, beta) {</span>
+<span id="cb9-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb9-3">}</span>
+<span id="cb9-4"></span>
+<span id="cb9-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">al =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">beta =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb9-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; Error in f(al = 1, beta = 2) : </span></span>
+<span id="cb9-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt;   argument 1 matches multiple formal arguments</span></span></code></pre></div></div>
+<p>The same call is now ambiguous because <code>al</code> could refer to either <code>alpha</code> or <code>alphabet</code>.</p>
+<p>This is why partial matching is useful for interactive exploration, but full argument names are usually safer in production code, package code, and reproducible scripts.</p>
+<section id="ambiguous-partial-matches-are-errors" class="level3">
+<h3 class="anchored" data-anchor-id="ambiguous-partial-matches-are-errors">Ambiguous partial matches are errors</h3>
+<p>Partial matching only works when the partial name uniquely identifies one formal argument.</p>
+<p>Consider this function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, alphabet, beta) {</span>
+<span id="cb10-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb10-3">}</span></code></pre></div></div>
+<p>Now consider this call:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alph =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">beta =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb11-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; Error in f(alph = 1, beta = 2) : </span></span>
+<span id="cb11-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt;   argument 1 matches multiple formal arguments</span></span></code></pre></div></div>
+<p>The supplied argument name <code>alph</code> could refer to either:</p>
+<ul>
+<li><code>alpha</code></li>
+<li><code>alphabet</code></li>
+</ul>
+<p>So R cannot safely decide which formal argument should receive the value <code>1</code>. That is an error.</p>
+<p>The general rule is:</p>
+<ul>
+<li>Partial matching is allowed only when the partial argument name matches one remaining formal argument unambiguously.</li>
+</ul>
+<p>This “remaining” part is important. R does not simply look at all formal arguments at once and ask whether the partial name is unique. Argument matching happens in stages.</p>
+<p>R first performs exact matching on named arguments. After exact matches have been resolved, those formal arguments are no longer available for partial matching.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, alphabet, beta) {</span>
+<span id="cb12-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb12-3">}</span>
+<span id="cb12-4"></span>
+<span id="cb12-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">al =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">beta =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb12-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, alphabet = 4, beta = 2)</span></span></code></pre></div></div>
+<p>At first glance, <code>al</code> may look ambiguous because both <code>alpha</code> and <code>alphabet</code> begin with <code>al</code>.</p>
+<p>However, the call works because <code>alpha = 1</code> is matched exactly first. Once <code>alpha</code> has been matched, it is removed from the pool of candidates. That leaves <code>alphabet</code> as the only remaining formal argument that can match <code>al</code>.</p>
+<p>So the matching process is effectively:</p>
+<ol type="1">
+<li><code>alpha = 1</code> is matched exactly to the formal argument <code>alpha</code>.</li>
+<li><code>beta = 2</code> is matched exactly to the formal argument <code>beta</code>.</li>
+<li><code>al = 4</code> is then considered for partial matching.</li>
+<li>Since <code>alpha</code> has already been matched, the only remaining formal argument starting with <code>al</code> is <code>alphabet</code>.</li>
+<li>Therefore, <code>al = 4</code> is matched to <code>alphabet</code>.</li>
+</ol>
+<p>This is one of the reasons R’s argument matching can feel flexible, but also slightly surprising. The meaning of a partially named argument can depend on which other arguments have already been matched exactly.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule for partial matching is:</p>
+<p>A named supplied argument may be matched to the beginning of a formal argument name, but only if that partial name uniquely identifies one remaining unmatched formal argument.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="positional-matching" class="level2">
+<h2 class="anchored" data-anchor-id="positional-matching">3. Positional matching</h2>
+<p>After exact matching and partial matching are complete, R performs <strong>positional matching</strong>.</p>
+<p>At this stage, any remaining <strong>unnamed supplied arguments</strong> are matched to the remaining <strong>unmatched formal arguments</strong> in order.</p>
+<p>The simplest example is a call where all supplied arguments are unnamed:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, beta, gamma) {</span>
+<span id="cb13-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb13-3">}</span>
+<span id="cb13-4"></span>
+<span id="cb13-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span>
+<span id="cb13-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, beta = 2, gamma = 3)</span></span></code></pre></div></div>
+<p>Here, there are no named arguments to match exactly or partially, so R falls back to position:</p>
+<ul>
+<li><code>1</code> -&gt; <code>alpha</code></li>
+<li><code>2</code> -&gt; <code>beta</code></li>
+<li><code>3</code> -&gt; <code>gamma</code></li>
+</ul>
+<p>This is ordinary positional matching: the first supplied argument goes to the first formal argument, the second supplied argument goes to the second formal argument, and so on.</p>
+<section id="positional-matching-after-name-based-matching" class="level3">
+<h3 class="anchored" data-anchor-id="positional-matching-after-name-based-matching">Positional matching after name-based matching</h3>
+<p>R’s positional matching becomes more interesting when named and unnamed arguments are mixed.</p>
+<p>Because exact and partial matching happen first, positional matching only deals with the arguments that are still unmatched.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, beta, gamma) {</span>
+<span id="cb14-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb14-3">}</span>
+<span id="cb14-4"></span>
+<span id="cb14-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gamma =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb14-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, beta = 2, gamma = 3)</span></span></code></pre></div></div>
+<p>R does not process this call strictly from left to right. Instead, it applies the matching rules in stages.</p>
+<p>First, exact matching is performed:</p>
+<ul>
+<li><code>gamma = 3</code> -&gt; <code>gamma</code></li>
+</ul>
+<p>After exact matching, the remaining unmatched formal arguments are:</p>
+<ul>
+<li><code>alpha</code></li>
+<li><code>beta</code></li>
+</ul>
+<p>The remaining supplied arguments are unnamed:</p>
+<ul>
+<li><code>1</code></li>
+<li><code>2</code></li>
+</ul>
+<p>Now positional matching applies:</p>
+<ul>
+<li><code>1</code> -&gt; <code>alpha</code></li>
+<li><code>2</code> -&gt; <code>beta</code></li>
+</ul>
+<p>This is why R allows named arguments to appear before unnamed positional arguments.</p>
+<p>In many other languages, this style would be invalid because positional arguments must come before named arguments. But R’s matching system is not a simple left-to-right binding rule.</p>
+<p>R first resolves name-based matches, and only then uses position for the remaining unmatched arguments.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule for positional matching is:</p>
+<p>After exact and partial matching are complete, remaining unnamed supplied arguments are matched by position to remaining unmatched formal arguments.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="the-special-role-of-..." class="level2">
+<h2 class="anchored" data-anchor-id="the-special-role-of-...">The special role of <code>...</code></h2>
+<p>The argument <code>...</code> has a special role in R’s argument matching system.</p>
+<p>It allows a function to accept additional supplied arguments beyond the ordinary formal arguments listed in the function definition.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, ...) {</span>
+<span id="cb15-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> alpha, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dots =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(...))</span>
+<span id="cb15-3">}</span>
+<span id="cb15-4"></span>
+<span id="cb15-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gamma =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span>
+<span id="cb15-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; $alpha</span></span>
+<span id="cb15-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; [1] 1</span></span>
+<span id="cb15-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt;</span></span>
+<span id="cb15-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; $dots</span></span>
+<span id="cb15-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; $dots[[1]]</span></span>
+<span id="cb15-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; [1] 2</span></span>
+<span id="cb15-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt;</span></span>
+<span id="cb15-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; $dots$gamma</span></span>
+<span id="cb15-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; [1] 3</span></span></code></pre></div></div>
+<p>Conceptually, this call is matched as follows:</p>
+<ul>
+<li><code>alpha = 1</code></li>
+<li><code>... = list(2, gamma = 3)</code></li>
+</ul>
+<p>The first unnamed supplied argument is matched positionally to <code>alpha</code>. The remaining supplied arguments are collected by <code>...</code>.</p>
+<p>A key point is that <code>...</code> can collect both unnamed and named supplied arguments:</p>
+<ul>
+<li><code>2</code> -&gt; collected by <code>...</code></li>
+<li><code>gamma = 3</code> -&gt; collected by <code>...</code></li>
+</ul>
+<p>So <code>...</code> is not limited to positional arguments. It can absorb any supplied arguments that have not already been matched to ordinary formal arguments.</p>
+<p>This makes <code>...</code> especially useful for wrapper functions.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1">my_plot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(x, y, ...) {</span>
+<span id="cb16-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">plot</span>(x, y, ...)</span>
+<span id="cb16-3">}</span></code></pre></div></div>
+<p>The wrapper function defines only three formal arguments: <code>x</code>, <code>y</code>, and <code>...</code>.</p>
+<p>But users can still pass additional arguments intended for <code>plot()</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">my_plot</span>(</span>
+<span id="cb17-2">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,</span>
+<span id="cb17-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">^</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,</span>
+<span id="cb17-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"red"</span>,</span>
+<span id="cb17-5">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">pch =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">19</span>,</span>
+<span id="cb17-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">main =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"My Plot"</span></span>
+<span id="cb17-7">)</span></code></pre></div></div>
+<p>Here, <code>x</code> and <code>y</code> are matched to the ordinary formal arguments of <code>my_plot()</code>, while <code>col</code>, <code>pch</code>, and <code>main</code> are collected by <code>...</code> and forwarded to <code>plot()</code>.</p>
+<p>Conceptually:</p>
+<ul>
+<li><code>x = 1:10</code></li>
+<li><code>y = (1:10)^2</code></li>
+<li><code>... = list(col = "red", pch = 19, main = "My Plot")</code></li>
+</ul>
+<p>This pattern is central to R programming. It allows one function to expose its own interface while still passing additional arguments to another function.</p>
+<section id="and-partial-matching" class="level3">
+<h3 class="anchored" data-anchor-id="and-partial-matching"><code>...</code> and partial matching</h3>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>There is an important rule involving <code>...</code> and partial matching:</p>
+<p>If a function has <code>...</code>, partial matching is only applied to formal arguments that appear before <code>...</code>.</p>
+</div>
+</div>
+<p>Consider this function:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(alpha, ..., beta) {</span>
+<span id="cb18-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb18-3">}</span></code></pre></div></div>
+<p>Here, <code>alpha</code> appears before <code>...</code>, while <code>beta</code> appears after <code>...</code>.</p>
+<p>Partial matching can apply to <code>alpha</code>, because it appears before <code>...</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">al =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb19-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1)</span></span></code></pre></div></div>
+<p>But partial matching does not apply to <code>beta</code>, because <code>beta</code> appears after <code>...</code>.</p>
+<p>So this call does not partially match <code>be</code> to <code>beta</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">be =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb20-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, be = 2)</span></span></code></pre></div></div>
+<p>Instead, <code>be = 2</code> is collected by <code>...</code>.</p>
+<p>To match <code>beta</code>, the argument should be supplied using its exact name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">beta =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb21-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#&gt; f(alpha = 1, beta = 2)</span></span></code></pre></div></div>
+<p>This rule matters because arguments after <code>...</code> are commonly used as control arguments that must be named explicitly.</p>
+<p>For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1">f <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(data, ..., <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">validate =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) {</span>
+<span id="cb22-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(</span>
+<span id="cb22-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> data,</span>
+<span id="cb22-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dots =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(...),</span>
+<span id="cb22-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">validate =</span> validate</span>
+<span id="cb22-6">  )</span>
+<span id="cb22-7">}</span></code></pre></div></div>
+<p>A call like this is clear:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(my_data, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">option1 =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"A"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">option2 =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"B"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">validate =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>)</span></code></pre></div></div>
+<p>Conceptually:</p>
+<ul>
+<li><code>data = my_data</code></li>
+<li><code>... = list(option1 = "A", option2 = "B")</code></li>
+<li><code>validate = FALSE</code></li>
+</ul>
+<p>The arguments <code>option1</code> and <code>option2</code> are collected by <code>...</code>, while <code>validate</code> is matched exactly by name.</p>
+<p>But this call would not partially match <code>val</code> to <code>validate</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">f</span>(my_data, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">option1 =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"A"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">val =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>)</span></code></pre></div></div>
+<p>Instead, <code>val = FALSE</code> would be collected by <code>...</code>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The key rule is:</p>
+<p>Formal arguments after <code>...</code> should be supplied by exact name. They are not matched positionally, and they are not matched by partial name.</p>
+</div>
+</div>
+<p>This behavior is intentional. It allows <code>...</code> to collect flexible additional arguments, while still letting function authors define later arguments that must be supplied explicitly and unambiguously.</p>
+</section>
+<section id="why-partial-matching-stops-at-..." class="level3">
+<h3 class="anchored" data-anchor-id="why-partial-matching-stops-at-...">Why partial matching stops at <code>...</code></h3>
+<p>Partial matching is not performed on formal arguments after <code>...</code> because <code>...</code> is often used to <strong>forward arguments to another function</strong>.</p>
+<p>If R allowed partial matching on formal arguments after <code>...</code>, the outer function could accidentally “steal” arguments that were meant for the inner function.</p>
+<p>This is easiest to understand with a wrapper function.</p>
+<p>Suppose we write a small helper that calculates a mean for one selected trimester. The wrapper has its own argument called <code>trimester</code>, while the inner function, <code>mean()</code>, has an argument called <code>trim</code>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1">mean_for_trimester <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(x, trimester_group, ..., <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trimester =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>) {</span>
+<span id="cb25-2">  x_selected <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> x[trimester_group <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> trimester]</span>
+<span id="cb25-3"></span>
+<span id="cb25-4">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(x_selected, ...)</span>
+<span id="cb25-5">}</span></code></pre></div></div>
+<p>Here, the intended design is:</p>
+<ul>
+<li><code>x</code> -&gt; used by <code>mean_for_trimester()</code></li>
+<li><code>trimester_group</code> -&gt; used by <code>mean_for_trimester()</code></li>
+<li><code>...</code> -&gt; forwarded to <code>mean()</code></li>
+<li><code>trimester</code> -&gt; used by <code>mean_for_trimester()</code> to select a group</li>
+</ul>
+<p>The important naming relationship is this:</p>
+<ul>
+<li><code>trim</code> is an argument of <code>mean()</code></li>
+<li><code>trimester</code> is an argument of <code>mean_for_trimester()</code></li>
+<li><code>trim</code> is a prefix of <code>trimester</code></li>
+</ul>
+<p>Now suppose the user calls:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean_for_trimester</span>(</span>
+<span id="cb26-2">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>),</span>
+<span id="cb26-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trimester_group =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>),</span>
+<span id="cb26-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trim =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span></span>
+<span id="cb26-5">)</span></code></pre></div></div>
+<p>The intended meaning is that <code>trim = 0.1</code> should be forwarded to <code>mean()</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(x_selected, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trim =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span></code></pre></div></div>
+<p>Conceptually, the outer call should be matched like this:</p>
+<ul>
+<li><code>x = c(10, 12, 15, 20, 30, 100)</code></li>
+<li><code>trimester_group = c(1, 1, 1, 1, 1, 1)</code></li>
+<li><code>... = list(trim = 0.1)</code></li>
+<li><code>trimester = 1</code></li>
+</ul>
+<p>Now imagine if R allowed partial matching on formal arguments after <code>...</code>.</p>
+<p>Since <code>trimester</code> begins with <code>trim</code>, the outer function could treat <code>trim = 0.1</code> as a partial match for <code>trimester</code>.</p>
+<p>Conceptually, the dangerous behavior would be:</p>
+<ul>
+<li><code>x = c(10, 12, 15, 20, 30, 100)</code></li>
+<li><code>trimester_group = c(1, 1, 1, 1, 1, 1)</code></li>
+<li><code>trimester = 0.1</code></li>
+<li><code>... = empty</code></li>
+</ul>
+<p>That would be a serious problem.</p>
+<p>The argument <code>trim = 0.1</code> was intended for <code>mean()</code>, where it is an exact match to the formal argument <code>trim</code>. But the outer function would consume it first as a partial match to <code>trimester</code>, before <code>mean()</code> ever received it.</p>
+<p>The wrapper would then call:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(x_selected)</span></code></pre></div></div>
+<p>instead of:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(x_selected, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trim =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span></code></pre></div></div>
+<p>That changes the meaning of the computation.</p>
+<p>This is especially dangerous because both arguments are numeric. The mistaken match would not necessarily produce an obvious type error. The code might still run, but with different semantics from what the caller intended.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>That is the key reason partial matching stops at <code>...</code>:</p>
+<p>Arguments after <code>...</code> are not partially matched because the outer function should not be allowed to steal arguments that may be intended for a function called inside it.</p>
+</div>
+</div>
+<p>In actual R behavior, this stealing does <strong>not</strong> happen.</p>
+<p>Because <code>trimester</code> appears after <code>...</code>, it must be matched by exact name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1">mean_for_trimester <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(x, trimester_group, ..., <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trimester =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>) {</span>
+<span id="cb30-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">match.call</span>()</span>
+<span id="cb30-3">}</span>
+<span id="cb30-4"></span>
+<span id="cb30-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean_for_trimester</span>(</span>
+<span id="cb30-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>),</span>
+<span id="cb30-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trimester_group =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>),</span>
+<span id="cb30-8">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trim =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span></span>
+<span id="cb30-9">)</span></code></pre></div></div>
+<p>Here, <code>trim = 0.1</code> is not partially matched to <code>trimester</code>. It remains available to be collected by <code>...</code>.</p>
+<p>To match <code>trimester</code>, the caller must use the exact name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb31" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean_for_trimester</span>(</span>
+<span id="cb31-2">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>),</span>
+<span id="cb31-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trimester_group =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>),</span>
+<span id="cb31-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">trimester =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb31-5">)</span></code></pre></div></div>
+<p>This creates a clean separation:</p>
+<ul>
+<li>arguments before <code>...</code> may be matched exactly, partially, or positionally;</li>
+<li><code>...</code> collects remaining supplied arguments;</li>
+<li>arguments after <code>...</code> must be matched exactly.</li>
+</ul>
+<p>So <code>...</code> acts as a boundary between two argument-matching contexts:</p>
+<ul>
+<li><code>mean_for_trimester()</code> matches its own ordinary arguments;</li>
+<li><code>...</code> carries unmatched arguments forward;</li>
+<li><code>mean()</code> matches those forwarded arguments later.</li>
+</ul>
+<p>Without this rule, wrapper functions would be much less predictable. An argument that is an exact match for the inner function could be captured as a partial match by the outer function. That would make <code>...</code> unsafe as a forwarding mechanism.</p>
+</section>
+</section>
+<section id="what-makes-rs-argument-matching-system-unique" class="level2">
+<h2 class="anchored" data-anchor-id="what-makes-rs-argument-matching-system-unique">What makes R’s argument matching system unique?</h2>
+<p>R’s argument matching system is unusual because it combines several matching strategies into one process.</p>
+<p>In many languages, argument passing is mostly governed by a strict distinction between positional arguments and named arguments. R is more flexible. A supplied argument can be matched by exact name, by partial name, or by position, and these rules are applied in a specific order.</p>
+<p>This means R does not simply bind arguments from left to right. Instead, it first resolves the clearest matches, then handles less explicit matches, and only then falls back to position.</p>
+<p>This design gives R a very expressive calling style. For interactive work, it can feel convenient and natural. Users can name important arguments, omit names for obvious arguments, and sometimes use shortened argument names.</p>
+<p>For example, R functions often support calls that mix named and unnamed arguments in ways that would be invalid in many other languages. This is not because R has no rules, but because its rules are different. R uses a staged matching system rather than a simple left-to-right binding system.</p>
+<p>The flexibility is powerful, but it also comes with trade-offs.</p>
+<p>Partial matching, in particular, can make code more fragile. A shortened argument name may work today but become ambiguous later if the function gains a new formal argument with a similar name. This is why partial matching is often convenient at the console but less desirable in production code.</p>
+<p>The <code>...</code> argument adds another layer to the system. It allows functions to collect and forward arguments, which is central to many R programming patterns. Wrapper functions, plotting functions, modelling functions, and generic interfaces often rely on <code>...</code> to pass arguments from one function to another.</p>
+<p>At the same time, <code>...</code> requires careful matching rules. In particular, formal arguments after <code>...</code> must be matched exactly. This prevents the outer function from accidentally capturing arguments that were intended to be forwarded to an inner function.</p>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>R’s argument matching system is one of the language’s most flexible features.</p>
+<p>At first, function calls in R may look simple: we supply values, and R passes those values into the function. But underneath that simple surface, R applies a structured matching process.</p>
+<p>The core rules are:</p>
+<ol type="1">
+<li>named arguments are first matched exactly;</li>
+<li>remaining named arguments may then be matched partially;</li>
+<li>remaining unnamed arguments are finally matched by position.</li>
+</ol>
+<p>The order matters. Exact matches remove formal arguments from further consideration. Partial matches only apply to the remaining unmatched formal arguments. Positional matching only happens after name-based matching is complete.</p>
+<p>The special argument <code>...</code> adds another important dimension. It allows functions to collect additional arguments and forward them to other functions. This makes wrapper functions possible, but it also explains why arguments after <code>...</code> must be supplied by exact name. Without that rule, an outer function could accidentally capture arguments meant for an inner function.</p>
+<p>For interactive work, partial argument names can be convenient. But for scripts, packages, production code, and reproducible analyses, full argument names are usually safer and clearer.</p>
+<p>A good rule of thumb is:</p>
+<ul>
+<li>use exact names for important arguments;</li>
+<li>avoid relying on partial matching in production code;</li>
+<li>be careful when designing functions that use <code>...</code>;</li>
+<li>place control arguments after <code>...</code> when you want them to be named explicitly;</li>
+<li>and remember that R matches arguments in stages, not simply from left to right.</li>
+</ul>
+<p>Understanding this system helps explain many things that otherwise feel surprising in R. It also helps you write clearer function calls, design safer function interfaces, and reason more accurately about how R code is evaluated.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>R Core Team. <em>R Language Definition</em>. “4.3.2 Argument matching”. <a href="https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Argument-matching">https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Argument-matching</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>R</category>
+  <category>Programming</category>
+  <guid>https://ankonyeni.github.io/notes-from-athi/posts/argument-matching/</guid>
+  <pubDate>Tue, 05 May 2026 22:00:00 GMT</pubDate>
+  <media:content url="https://ankonyeni.github.io/notes-from-athi/posts/argument-matching/image.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>R’s Experimental =&gt; Operator</title>
   <dc:creator>Athenkosi Nkonyeni</dc:creator>
@@ -24,9 +1110,15 @@
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>R is remarkably conservative regarding core syntax. While the surface suggests a vast array of syntactic forms (arithmetic operators, indexing brackets, and control flow), R’s elegance lies in its exceptionally small grammar.</p>
+<section id="most-syntax-is-function-calls" class="level3">
+<h3 class="anchored" data-anchor-id="most-syntax-is-function-calls">Most Syntax Is Function Calls</h3>
 <p>The defining characteristic of this grammar is that almost everything is a <strong>function call in disguise</strong>. In R, <code>1 + 2</code> is functionally equivalent to the backticked call <code>`+`(1, 2)</code>. Even constructs like <code>if</code> or <code>for</code> are internal functions that return values. This ability to inspect and manipulate code as language objects allows R to remain flexible without a sprawling list of hard-coded rules.</p>
-<p>However, the famous adage that “<strong>in R, everything is an object</strong>” is only partially true. While most of R’s power stems from objects and function calls, a handful of symbols exist as <strong>pure grammar</strong>. These are parsing instructions rather than functions. For instance, the right-assignment operator <code>-&gt;</code> cannot be called as a function; the parser immediately rewrites <code>1 -&gt; x</code> as <code>`&lt;-`(x, 1)</code> before execution. Because these constructs exist only as rules for the parser, they lack the object status that defines the rest of the language.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
+</section>
+<section id="some-syntax-is-parser-only" class="level3">
+<h3 class="anchored" data-anchor-id="some-syntax-is-parser-only">Some Syntax Is Parser-Only</h3>
+<p>However, the famous adage that “<strong>in R, everything is an object</strong>” is only partially true. While most of R’s power stems from objects and function calls, a handful of symbols exist as <strong>pure grammar</strong>. These are parsing instructions rather than functions. For instance, the right-assignment operator <code>-&gt;</code> cannot be called as a function; the parser immediately rewrites <code>1 -&gt; x</code> as <code>x &lt;- 1</code> before execution. Because these constructs exist only as rules for the parser, they lack the object status that defines the rest of the language.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
 background-color: null;
 font-style: inherit;">quote</span>(<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -36,11 +1128,14 @@ font-style: inherit;">-&gt;</span> x)</span>
 <span id="cb1-2"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">#&gt; x &lt;- 1</span></span></code></pre></div></div>
+</div>
+</section>
 </section>
 <section id="the-native-pipe-r-joins-the-show" class="level2">
 <h2 class="anchored" data-anchor-id="the-native-pipe-r-joins-the-show">The Native Pipe: R Joins the Show</h2>
 <p>With R 4.1.0, the language officially introduced the native pipe operator <code>|&gt;</code>. While R was late to this style compared to functional peers like <strong>F#, Elixir,</strong> and <strong>OCaml</strong>, its implementation was heavily influenced by the massive success of the <code>magrittr</code> package. For years, the <code>%&gt;%</code> operator was the de facto standard, proving a deep appetite for linear, readable data transformations over deeply nested expressions:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Nested</span></span>
 <span id="cb2-2"><span class="fu" style="color: #4758AB;
@@ -90,10 +1185,12 @@ font-style: inherit;">|&gt;</span></span>
 <span id="cb2-8">  <span class="fu" style="color: #4758AB;
 background-color: null;
 font-style: inherit;">head</span>()</span></code></pre></div></div>
+</div>
 <section id="how-the-native-pipe-works" class="level3">
 <h3 class="anchored" data-anchor-id="how-the-native-pipe-works">How the Native Pipe Works</h3>
 <p>Unlike <code>magrittr</code>, which operates as a function at runtime, the native pipe is a <strong>compile-time transformation</strong>. When the R parser encounters <code>x |&gt; f(y)</code>, it does not run a pipe function. Instead, it physically rewrites the expression into <code>f(x, y)</code> before any code is executed. This lack of overhead makes the native pipe more efficient and ensures stack traces remain clean.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="fu" style="color: #4758AB;
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="fu" style="color: #4758AB;
 background-color: null;
 font-style: inherit;">quote</span>(iris <span class="sc" style="color: #5E5E5E;
 background-color: null;
@@ -103,12 +1200,14 @@ font-style: inherit;">head</span>())</span>
 <span id="cb3-2"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">#&gt; head(iris)</span></span></code></pre></div></div>
+</div>
 </section>
 <section id="the-grammar-of-the-placeholder-_" class="level3">
 <h3 class="anchored" data-anchor-id="the-grammar-of-the-placeholder-_">The Grammar of the Placeholder <code>_</code></h3>
 <p>Because the native pipe is pure grammar, it requires a syntactic way to handle cases where data should not go into the first argument. R 4.2.0 introduced the placeholder <code>_</code> for this purpose.</p>
 <p>Like the pipe itself, the underscore is not an object; you cannot assign a value to <code>_</code> or use it in a standard calculation. It is a coordinate for the parser. When the parser sees <code>_</code>, it recognizes it as a signal to move the left-hand side into that specific named argument.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="fu" style="color: #4758AB;
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="fu" style="color: #4758AB;
 background-color: null;
 font-style: inherit;">quote</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -124,9 +1223,10 @@ font-style: inherit;">x =</span> _))</span>
 <span id="cb4-2"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">#&gt; grepl("W", x = "Hello World")</span></span></code></pre></div></div>
+</div>
 </section>
-<section id="important-note-syntax-vs.-functions" class="level3">
-<h3 class="anchored" data-anchor-id="important-note-syntax-vs.-functions"><strong>Important Note: Syntax vs.&nbsp;Functions</strong></h3>
+<section id="syntax-vs.-functions-why-this-distinction-matters" class="level3">
+<h3 class="anchored" data-anchor-id="syntax-vs.-functions-why-this-distinction-matters">Syntax vs.&nbsp;Functions: Why This Distinction Matters</h3>
 <p>It is critical to distinguish between these two implementations. The <code>magrittr</code> pipe <code>%&gt;%</code> and its dot placeholder <code>.</code> are <strong>runtime constructs</strong> that rely on complex environment management. Under the hood, <code>magrittr</code>’s C code treats the dot as a <code>SYMSXP</code> (a symbol object). As each step of the pipe evaluates, the code manually binds and updates this symbol in a dedicated execution environment using <code>Rf_defineVar</code>. A variable named <code>.</code> is created and repeatedly overwritten to pass data forward.</p>
 <p>In contrast, the native pipe <code>|&gt;</code> and the <code>_</code> placeholder are not objects or variables at all; they are <strong>parsing instructions</strong>. The underscore is a special token that exists only as a coordinate for the parser. When you write <code>x |&gt; f(y = _)</code>, the parser physically rewrites the expression into <code>f(y = x)</code> before the code is even compiled or executed. The pipe and the placeholder effectively disappear during the transition from source code to the Abstract Syntax Tree (AST), leaving the engine to execute standard, optimized function calls with no internal “variable shuffling.”</p>
 <p>While the native pipe <code>|&gt;</code> is a powerful tool for streamlining code, its design as a strict syntactic rewriter introduces structural hurdles. Because it is a simple instruction for the parser rather than a sophisticated function, it lacks the flexibility required for certain complex data transformations.</p>
@@ -144,16 +1244,22 @@ font-style: inherit;">#&gt; grepl("W", x = "Hello World")</span></span></code></
 <section id="discovering-the-hidden-grammar" class="level2">
 <h2 class="anchored" data-anchor-id="discovering-the-hidden-grammar">Discovering the Hidden Grammar</h2>
 <p>These limitations often force users back toward the magrittr package. However, while browsing through the R source code, I noticed an experimental feature hidden within the language’s own grammar.</p>
-<p>I was looking into the core grammar file <a href="https://github.com/wch/r-source/blob/trunk/src/main/gram.c#L4662">src/main/gram.c</a> in the R source, where the fundamental rules of how R interprets text are defined. Amidst the low-level logic that handles assignment and control flow, the symbol <code>=&gt;</code> caught my eye. It wasn’t a standard operator I had seen in any documentation, but there it was, baked into the very foundation of the R parser as an experimental feature.</p>
-<p>Curiosity piqued, I did some digging to find out when this was first proposed. According to my investigation, I traced it back to January 2021. Based on the <a href="https://stat.ethz.ch/pipermail/r-devel/2021-January/080397.html">R-devel mailing list archives</a>, this is one of the earliest discussions I could find regarding the operator, where it was debated as a way to provide a more flexible “binding” mechanism.</p>
+<section id="spotting-in-r-source" class="level3">
+<h3 class="anchored" data-anchor-id="spotting-in-r-source">Spotting <code>=&gt;</code> in R Source</h3>
+<p>I was looking into the core grammar file <a href="https://github.com/r-devel/r-svn/blob/main/src/main/gram.c#L4662">src/main/gram.c</a> in the R source, where the fundamental rules of how R interprets text are defined. Amidst the low-level logic that handles assignment and control flow, the symbol <code>=&gt;</code> caught my eye. It wasn’t a standard operator I had seen in any documentation, but there it was, baked into the very foundation of the R parser as an experimental feature.</p>
 </section>
-<section id="the-experimental-bind-pipe" class="level2">
-<h2 class="anchored" data-anchor-id="the-experimental-bind-pipe">The Experimental Bind Pipe <code>=&gt;</code></h2>
-<p>The experimental bind pipe (<code>=&gt;</code>) is designed to clear the structural hurdles inherent in the native pipe. If the standard pipe is about <strong>redirection</strong>, the bind pipe is about <strong>lexical binding</strong>.</p>
-<p>Instead of a “blind” injection into a single argument slot, the bind pipe allows you to <strong>bind</strong> the left-hand side to a temporary name (a variable) that exists only for the scope of the next expression.</p>
-<section id="how-the-bind-pipe-works" class="level3">
-<h3 class="anchored" data-anchor-id="how-the-bind-pipe-works">How the Bind Pipe Works</h3>
-<p>Like the pipe operator, the bind pipe is implemented purely as grammar. When the parser encounters the bind pipe syntax <code>x |&gt; y =&gt; expr</code>, it follows a specific transformation rule:</p>
+<section id="tracing-the-first-discussion" class="level3">
+<h3 class="anchored" data-anchor-id="tracing-the-first-discussion">Tracing the First Discussion</h3>
+<p>Curiosity piqued, I did some digging to find out when this was first proposed. According to my investigation, I traced it back to January 2021. Based on the <a href="https://stat.ethz.ch/pipermail/r-devel/2021-January/080396.html">R-devel mailing list archives</a>, this is one of the earliest discussions I could find regarding the operator, where it was debated as a way to provide a more flexible “binding” mechanism.</p>
+</section>
+</section>
+<section id="the-experimental-pipe-bind" class="level2">
+<h2 class="anchored" data-anchor-id="the-experimental-pipe-bind">The Experimental Pipe-Bind <code>=&gt;</code></h2>
+<p>The experimental pipe bind (<code>=&gt;</code>) is designed to clear the structural hurdles inherent in the native pipe. If the standard pipe is about <strong>redirection</strong>, the pipe bind is about <strong>lexical binding</strong>.</p>
+<p>Instead of a “blind” injection into a single argument slot, the pipe bind allows you to <strong>bind</strong> the left-hand side to a temporary name (a variable) that exists only for the scope of the next expression.</p>
+<section id="how-the-pipe-bind-works" class="level3">
+<h3 class="anchored" data-anchor-id="how-the-pipe-bind-works">How the Pipe Bind Works</h3>
+<p>Like the pipe operator, the pipe bind is implemented purely as grammar. When the parser encounters the pipe bind syntax <code>x |&gt; y =&gt; expr</code>, it follows a specific transformation rule:</p>
 <ol type="1">
 <li>It takes the object on the left (<code>x</code>).</li>
 <li>It creates a temporary, anonymous function where the name you provided (<code>y</code>) is the argument.</li>
@@ -161,10 +1267,12 @@ font-style: inherit;">#&gt; grepl("W", x = "Hello World")</span></span></code></
 <li>It immediately calls that function using <code>x</code> as the input.</li>
 </ol>
 <p>Essentially, <code>x |&gt; y =&gt; expr</code> is a syntactic shortcut for:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1">(<span class="cf" style="color: #003B4F;
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1">(<span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">function</span>(y) expr)(x)</span></code></pre></div></div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -176,7 +1284,8 @@ Important
 </div>
 <div class="callout-body-container callout-body">
 <p>To try out this feature in R, you must first set the following environment variable:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="fu" style="color: #4758AB;
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="fu" style="color: #4758AB;
 background-color: null;
 font-style: inherit;">Sys.setenv</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -185,6 +1294,7 @@ background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"TRUE"</span>)</span></code></pre></div></div>
+</div>
 <p>Otherwise, you will encounter the following error when attempting to use the operator:</p>
 <p><code>Error: '=&gt;' is disabled; set '_R_USE_PIPEBIND_' envvar to a true value to enable it (&lt;input&gt;:1:11)</code></p>
 </div>
@@ -192,10 +1302,12 @@ font-style: inherit;">"TRUE"</span>)</span></code></pre></div></div>
 </section>
 <section id="how-it-overcomes-the-pipes-hurdles" class="level3">
 <h3 class="anchored" data-anchor-id="how-it-overcomes-the-pipes-hurdles">How it Overcomes the Pipe’s Hurdles</h3>
-<p>The bind pipe transforms the logic from structural rewriting to a temporary local scope:</p>
-<ul>
-<li><p><strong>Multiple Uses:</strong> Since the data is bound to a name, you can reference it as many times as you want.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1">data <span class="ot" style="color: #003B4F;
+<p>The pipe bind transforms the logic from structural rewriting to a temporary local scope:</p>
+<section id="multiple-uses" class="level4">
+<h4 class="anchored" data-anchor-id="multiple-uses">Multiple Uses</h4>
+<p>Since the data is bound to a name, you can reference it as many times as you want.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1">data <span class="ot" style="color: #003B4F;
 background-color: null;
 font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
 background-color: null;
@@ -245,9 +1357,14 @@ background-color: null;
 font-style: inherit;">#&gt; 4    13    2</span></span>
 <span id="cb7-11"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">#&gt; 5    10   -1</span></span></code></pre></div></div></li>
-<li><p><strong>Positional Freedom:</strong> Because the right-hand side is treated as a scope where the data is simply a variable, you can use the bound data in any positional argument without the need to specify a parameter name (like <code>x = _</code>).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+font-style: inherit;">#&gt; 5    10   -1</span></span></code></pre></div></div>
+</div>
+</section>
+<section id="positional-freedom" class="level4">
+<h4 class="anchored" data-anchor-id="positional-freedom">Positional Freedom</h4>
+<p>Because the right-hand side is treated as a scope where the data is simply a variable, you can use the bound data in any positional argument without the need to specify a parameter name (like <code>x = _</code>).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># No need for named arguments; the variable can be passed positionally</span></span>
 <span id="cb8-2"><span class="st" style="color: #20794D;
@@ -265,9 +1382,14 @@ background-color: null;
 font-style: inherit;">"j"</span>, string)</span>
 <span id="cb8-3"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">#&gt; [1] "jello"</span></span></code></pre></div></div></li>
-<li><p><strong>Expression Freedom:</strong> The bind pipe does not require a formal function call on the right-hand side. You can pipe directly into raw expressions or braced blocks, bypassing the need for a strict function structure.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1">data <span class="ot" style="color: #003B4F;
+font-style: inherit;">#&gt; [1] "jello"</span></span></code></pre></div></div>
+</div>
+</section>
+<section id="expression-freedom" class="level4">
+<h4 class="anchored" data-anchor-id="expression-freedom">Expression Freedom</h4>
+<p>The pipe bind does not require a formal function call on the right-hand side. You can pipe directly into raw expressions or braced blocks, bypassing the need for a strict function structure.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1">data <span class="ot" style="color: #003B4F;
 background-color: null;
 font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
 background-color: null;
@@ -311,8 +1433,10 @@ font-style: inherit;">/</span>n</span>
 <span id="cb9-8"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">#&gt; [1] 11.125</span></span></code></pre></div></div>
-<p>Because the bind pipe binds the incoming lhs to a specific variable name, the rhs is no longer restricted to being a function call. It can be any valid R expression.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1">mtcars[mtcars<span class="sc" style="color: #5E5E5E;
+</div>
+<p>Because the pipe bind binds the incoming lhs to a specific variable name, the rhs is no longer restricted to being a function call. It can be any valid R expression.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1">mtcars[mtcars<span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">$</span>cyl <span class="sc" style="color: #5E5E5E;
 background-color: null;
@@ -353,15 +1477,16 @@ font-style: inherit;">"No records found to run the model."</span>)</span>
 <span id="cb10-7">}</span>
 <span id="cb10-8"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">#&gt; No records found to run the model.</span></span></code></pre></div></div></li>
-</ul>
+font-style: inherit;">#&gt; No records found to run the model.</span></span></code></pre></div></div>
+</div>
+</section>
 </section>
 </section>
 <section id="conclusion-a-glimpse-into-rs-future" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion-a-glimpse-into-rs-future">Conclusion: A Glimpse into R’s Future</h2>
-<p>The <code>=&gt;</code> operator is an interesting addition to R’s syntax. While the native pipe <code>|&gt;</code> streamlines linear code through simple rewriting, the bind pipe addresses the need for more flexible plumbing: referencing the same dataset multiple times and performing inline operations.</p>
+<p>The <code>=&gt;</code> operator is an interesting addition to R’s syntax. While the native pipe <code>|&gt;</code> streamlines linear code through simple rewriting, the pipe bind addresses the need for more flexible plumbing: referencing the same dataset multiple times and performing inline operations.</p>
 <p>However, it is important to remember that this is an experimental feature. It remains hidden behind an environment variable because it is still a “draft” within the language’s source code. There is no guarantee that it will be promoted to a stable, production-ready release. If it does eventually graduate, both its syntax and its underlying behavior may change to ensure long-term compatibility with the rest of the language.</p>
-<p>For now, the bind pipe offers a look at how R might further bridge the gap between simple piping and complex functional programming. Whether it remains hidden in the source code or becomes a standard feature, it demonstrates a thoughtful approach to making R’s grammar more expressive for modern data workflows.</p>
+<p>For now, the pipe bind offers a look at how R might further bridge the gap between simple piping and complex functional programming. Whether it remains hidden in the source code or becomes a standard feature, it demonstrates a thoughtful approach to making R’s grammar more expressive for modern data workflows.</p>
 
 
 </section>
@@ -371,7 +1496,7 @@ font-style: inherit;">#&gt; No records found to run the model.</span></span></co
   <category>Programming</category>
   <guid>https://ankonyeni.github.io/notes-from-athi/posts/bind-pipe/</guid>
   <pubDate>Thu, 30 Apr 2026 22:00:00 GMT</pubDate>
-  <media:content url="https://ankonyeni.github.io/notes-from-athi/posts/bind-pipe/image.png" medium="image" type="image/png" height="62" width="144"/>
+  <media:content url="https://ankonyeni.github.io/notes-from-athi/posts/bind-pipe/image.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>

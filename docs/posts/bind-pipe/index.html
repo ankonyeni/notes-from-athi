@@ -133,13 +133,13 @@ background-size: cover;
 <meta property="og:description" content="A deep dive into R’s experimental pipe-bind operator">
 <meta property="og:image" content="https://ankonyeni.github.io/notes-from-athi/posts/bind-pipe/image.png">
 <meta property="og:site_name" content="Notes from Athi">
-<meta property="og:image:height" content="821">
-<meta property="og:image:width" content="1916">
+<meta property="og:image:height" content="941">
+<meta property="og:image:width" content="1672">
 <meta name="twitter:title" content="R’s Experimental => Operator – Notes from Athi">
 <meta name="twitter:description" content="A deep dive into R’s experimental pipe-bind operator">
 <meta name="twitter:image" content="https://ankonyeni.github.io/notes-from-athi/posts/bind-pipe/image.png">
-<meta name="twitter:image-height" content="821">
-<meta name="twitter:image-width" content="1916">
+<meta name="twitter:image-height" content="941">
+<meta name="twitter:image-width" content="1672">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 
@@ -163,10 +163,6 @@ background-size: cover;
   <li class="nav-item">
     <a class="nav-link" href="../../index.html"> 
 <span class="menu-text">Home</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="../../r.html"> 
-<span class="menu-text">R</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="../../archive.html"> 
@@ -242,18 +238,26 @@ background-size: cover;
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a>
+  <ul class="collapse">
+  <li><a href="#most-syntax-is-function-calls" id="toc-most-syntax-is-function-calls" class="nav-link" data-scroll-target="#most-syntax-is-function-calls">Most Syntax Is Function Calls</a></li>
+  <li><a href="#some-syntax-is-parser-only" id="toc-some-syntax-is-parser-only" class="nav-link" data-scroll-target="#some-syntax-is-parser-only">Some Syntax Is Parser-Only</a></li>
+  </ul></li>
   <li><a href="#the-native-pipe-r-joins-the-show" id="toc-the-native-pipe-r-joins-the-show" class="nav-link" data-scroll-target="#the-native-pipe-r-joins-the-show">The Native Pipe: R Joins the Show</a>
   <ul class="collapse">
   <li><a href="#how-the-native-pipe-works" id="toc-how-the-native-pipe-works" class="nav-link" data-scroll-target="#how-the-native-pipe-works">How the Native Pipe Works</a></li>
   <li><a href="#the-grammar-of-the-placeholder-_" id="toc-the-grammar-of-the-placeholder-_" class="nav-link" data-scroll-target="#the-grammar-of-the-placeholder-_">The Grammar of the Placeholder <code>_</code></a></li>
-  <li><a href="#important-note-syntax-vs.-functions" id="toc-important-note-syntax-vs.-functions" class="nav-link" data-scroll-target="#important-note-syntax-vs.-functions"><strong>Important Note: Syntax vs.&nbsp;Functions</strong></a></li>
+  <li><a href="#syntax-vs.-functions-why-this-distinction-matters" id="toc-syntax-vs.-functions-why-this-distinction-matters" class="nav-link" data-scroll-target="#syntax-vs.-functions-why-this-distinction-matters">Syntax vs.&nbsp;Functions: Why This Distinction Matters</a></li>
   </ul></li>
   <li><a href="#the-limitations-of-the-native-pipe" id="toc-the-limitations-of-the-native-pipe" class="nav-link" data-scroll-target="#the-limitations-of-the-native-pipe">The Limitations of the Native Pipe</a></li>
-  <li><a href="#discovering-the-hidden-grammar" id="toc-discovering-the-hidden-grammar" class="nav-link" data-scroll-target="#discovering-the-hidden-grammar">Discovering the Hidden Grammar</a></li>
-  <li><a href="#the-experimental-bind-pipe" id="toc-the-experimental-bind-pipe" class="nav-link" data-scroll-target="#the-experimental-bind-pipe">The Experimental Bind Pipe <code>=&gt;</code></a>
+  <li><a href="#discovering-the-hidden-grammar" id="toc-discovering-the-hidden-grammar" class="nav-link" data-scroll-target="#discovering-the-hidden-grammar">Discovering the Hidden Grammar</a>
   <ul class="collapse">
-  <li><a href="#how-the-bind-pipe-works" id="toc-how-the-bind-pipe-works" class="nav-link" data-scroll-target="#how-the-bind-pipe-works">How the Bind Pipe Works</a></li>
+  <li><a href="#spotting-in-r-source" id="toc-spotting-in-r-source" class="nav-link" data-scroll-target="#spotting-in-r-source">Spotting <code>=&gt;</code> in R Source</a></li>
+  <li><a href="#tracing-the-first-discussion" id="toc-tracing-the-first-discussion" class="nav-link" data-scroll-target="#tracing-the-first-discussion">Tracing the First Discussion</a></li>
+  </ul></li>
+  <li><a href="#the-experimental-pipe-bind" id="toc-the-experimental-pipe-bind" class="nav-link" data-scroll-target="#the-experimental-pipe-bind">The Experimental Pipe-Bind <code>=&gt;</code></a>
+  <ul class="collapse">
+  <li><a href="#how-the-pipe-bind-works" id="toc-how-the-pipe-bind-works" class="nav-link" data-scroll-target="#how-the-pipe-bind-works">How the Pipe Bind Works</a></li>
   <li><a href="#how-it-overcomes-the-pipes-hurdles" id="toc-how-it-overcomes-the-pipes-hurdles" class="nav-link" data-scroll-target="#how-it-overcomes-the-pipes-hurdles">How it Overcomes the Pipe’s Hurdles</a></li>
   </ul></li>
   <li><a href="#conclusion-a-glimpse-into-rs-future" id="toc-conclusion-a-glimpse-into-rs-future" class="nav-link" data-scroll-target="#conclusion-a-glimpse-into-rs-future">Conclusion: A Glimpse into R’s Future</a></li>
@@ -270,15 +274,24 @@ background-size: cover;
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>R is remarkably conservative regarding core syntax. While the surface suggests a vast array of syntactic forms (arithmetic operators, indexing brackets, and control flow), R’s elegance lies in its exceptionally small grammar.</p>
+<section id="most-syntax-is-function-calls" class="level3">
+<h3 class="anchored" data-anchor-id="most-syntax-is-function-calls">Most Syntax Is Function Calls</h3>
 <p>The defining characteristic of this grammar is that almost everything is a <strong>function call in disguise</strong>. In R, <code>1 + 2</code> is functionally equivalent to the backticked call <code>`+`(1, 2)</code>. Even constructs like <code>if</code> or <code>for</code> are internal functions that return values. This ability to inspect and manipulate code as language objects allows R to remain flexible without a sprawling list of hard-coded rules.</p>
-<p>However, the famous adage that “<strong>in R, everything is an object</strong>” is only partially true. While most of R’s power stems from objects and function calls, a handful of symbols exist as <strong>pure grammar</strong>. These are parsing instructions rather than functions. For instance, the right-assignment operator <code>-&gt;</code> cannot be called as a function; the parser immediately rewrites <code>1 -&gt; x</code> as <code>`&lt;-`(x, 1)</code> before execution. Because these constructs exist only as rules for the parser, they lack the object status that defines the rest of the language.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quote</span>(<span class="dv">1</span> <span class="ot">-&gt;</span> x)</span>
+</section>
+<section id="some-syntax-is-parser-only" class="level3">
+<h3 class="anchored" data-anchor-id="some-syntax-is-parser-only">Some Syntax Is Parser-Only</h3>
+<p>However, the famous adage that “<strong>in R, everything is an object</strong>” is only partially true. While most of R’s power stems from objects and function calls, a handful of symbols exist as <strong>pure grammar</strong>. These are parsing instructions rather than functions. For instance, the right-assignment operator <code>-&gt;</code> cannot be called as a function; the parser immediately rewrites <code>1 -&gt; x</code> as <code>x &lt;- 1</code> before execution. Because these constructs exist only as rules for the parser, they lack the object status that defines the rest of the language.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quote</span>(<span class="dv">1</span> <span class="ot">-&gt;</span> x)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x &lt;- 1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
 </section>
 <section id="the-native-pipe-r-joins-the-show" class="level2">
 <h2 class="anchored" data-anchor-id="the-native-pipe-r-joins-the-show">The Native Pipe: R Joins the Show</h2>
 <p>With R 4.1.0, the language officially introduced the native pipe operator <code>|&gt;</code>. While R was late to this style compared to functional peers like <strong>F#, Elixir,</strong> and <strong>OCaml</strong>, its implementation was heavily influenced by the massive success of the <code>magrittr</code> package. For years, the <code>%&gt;%</code> operator was the de facto standard, proving a deep appetite for linear, readable data transformations over deeply nested expressions:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Nested</span></span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Nested</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">transform</span>(<span class="fu">subset</span>(mtcars, cyl <span class="sc">==</span> <span class="dv">6</span>), <span class="at">kmpl =</span> mpg <span class="sc">*</span> <span class="fl">0.425144</span>))</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Linear</span></span>
@@ -286,21 +299,26 @@ background-size: cover;
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">subset</span>(cyl <span class="sc">==</span> <span class="dv">6</span>) <span class="sc">|&gt;</span></span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transform</span>(<span class="at">kmpl =</span> mpg <span class="sc">*</span> <span class="fl">0.425144</span>) <span class="sc">|&gt;</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <section id="how-the-native-pipe-works" class="level3">
 <h3 class="anchored" data-anchor-id="how-the-native-pipe-works">How the Native Pipe Works</h3>
 <p>Unlike <code>magrittr</code>, which operates as a function at runtime, the native pipe is a <strong>compile-time transformation</strong>. When the R parser encounters <code>x |&gt; f(y)</code>, it does not run a pipe function. Instead, it physically rewrites the expression into <code>f(x, y)</code> before any code is executed. This lack of overhead makes the native pipe more efficient and ensures stack traces remain clean.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quote</span>(iris <span class="sc">|&gt;</span> <span class="fu">head</span>())</span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quote</span>(iris <span class="sc">|&gt;</span> <span class="fu">head</span>())</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; head(iris)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </section>
 <section id="the-grammar-of-the-placeholder-_" class="level3">
 <h3 class="anchored" data-anchor-id="the-grammar-of-the-placeholder-_">The Grammar of the Placeholder <code>_</code></h3>
 <p>Because the native pipe is pure grammar, it requires a syntactic way to handle cases where data should not go into the first argument. R 4.2.0 introduced the placeholder <code>_</code> for this purpose.</p>
 <p>Like the pipe itself, the underscore is not an object; you cannot assign a value to <code>_</code> or use it in a standard calculation. It is a coordinate for the parser. When the parser sees <code>_</code>, it recognizes it as a signal to move the left-hand side into that specific named argument.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quote</span>(<span class="st">"Hello World"</span> <span class="sc">|&gt;</span> <span class="fu">grepl</span>(<span class="st">'W'</span>, <span class="at">x =</span> _))</span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">quote</span>(<span class="st">"Hello World"</span> <span class="sc">|&gt;</span> <span class="fu">grepl</span>(<span class="st">'W'</span>, <span class="at">x =</span> _))</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; grepl("W", x = "Hello World")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </section>
-<section id="important-note-syntax-vs.-functions" class="level3">
-<h3 class="anchored" data-anchor-id="important-note-syntax-vs.-functions"><strong>Important Note: Syntax vs.&nbsp;Functions</strong></h3>
+<section id="syntax-vs.-functions-why-this-distinction-matters" class="level3">
+<h3 class="anchored" data-anchor-id="syntax-vs.-functions-why-this-distinction-matters">Syntax vs.&nbsp;Functions: Why This Distinction Matters</h3>
 <p>It is critical to distinguish between these two implementations. The <code>magrittr</code> pipe <code>%&gt;%</code> and its dot placeholder <code>.</code> are <strong>runtime constructs</strong> that rely on complex environment management. Under the hood, <code>magrittr</code>’s C code treats the dot as a <code>SYMSXP</code> (a symbol object). As each step of the pipe evaluates, the code manually binds and updates this symbol in a dedicated execution environment using <code>Rf_defineVar</code>. A variable named <code>.</code> is created and repeatedly overwritten to pass data forward.</p>
 <p>In contrast, the native pipe <code>|&gt;</code> and the <code>_</code> placeholder are not objects or variables at all; they are <strong>parsing instructions</strong>. The underscore is a special token that exists only as a coordinate for the parser. When you write <code>x |&gt; f(y = _)</code>, the parser physically rewrites the expression into <code>f(y = x)</code> before the code is even compiled or executed. The pipe and the placeholder effectively disappear during the transition from source code to the Abstract Syntax Tree (AST), leaving the engine to execute standard, optimized function calls with no internal “variable shuffling.”</p>
 <p>While the native pipe <code>|&gt;</code> is a powerful tool for streamlining code, its design as a strict syntactic rewriter introduces structural hurdles. Because it is a simple instruction for the parser rather than a sophisticated function, it lacks the flexibility required for certain complex data transformations.</p>
@@ -318,16 +336,22 @@ background-size: cover;
 <section id="discovering-the-hidden-grammar" class="level2">
 <h2 class="anchored" data-anchor-id="discovering-the-hidden-grammar">Discovering the Hidden Grammar</h2>
 <p>These limitations often force users back toward the magrittr package. However, while browsing through the R source code, I noticed an experimental feature hidden within the language’s own grammar.</p>
-<p>I was looking into the core grammar file <a href="https://github.com/wch/r-source/blob/trunk/src/main/gram.c#L4662">src/main/gram.c</a> in the R source, where the fundamental rules of how R interprets text are defined. Amidst the low-level logic that handles assignment and control flow, the symbol <code>=&gt;</code> caught my eye. It wasn’t a standard operator I had seen in any documentation, but there it was, baked into the very foundation of the R parser as an experimental feature.</p>
-<p>Curiosity piqued, I did some digging to find out when this was first proposed. According to my investigation, I traced it back to January 2021. Based on the <a href="https://stat.ethz.ch/pipermail/r-devel/2021-January/080397.html">R-devel mailing list archives</a>, this is one of the earliest discussions I could find regarding the operator, where it was debated as a way to provide a more flexible “binding” mechanism.</p>
+<section id="spotting-in-r-source" class="level3">
+<h3 class="anchored" data-anchor-id="spotting-in-r-source">Spotting <code>=&gt;</code> in R Source</h3>
+<p>I was looking into the core grammar file <a href="https://github.com/r-devel/r-svn/blob/main/src/main/gram.c#L4662">src/main/gram.c</a> in the R source, where the fundamental rules of how R interprets text are defined. Amidst the low-level logic that handles assignment and control flow, the symbol <code>=&gt;</code> caught my eye. It wasn’t a standard operator I had seen in any documentation, but there it was, baked into the very foundation of the R parser as an experimental feature.</p>
 </section>
-<section id="the-experimental-bind-pipe" class="level2">
-<h2 class="anchored" data-anchor-id="the-experimental-bind-pipe">The Experimental Bind Pipe <code>=&gt;</code></h2>
-<p>The experimental bind pipe (<code>=&gt;</code>) is designed to clear the structural hurdles inherent in the native pipe. If the standard pipe is about <strong>redirection</strong>, the bind pipe is about <strong>lexical binding</strong>.</p>
-<p>Instead of a “blind” injection into a single argument slot, the bind pipe allows you to <strong>bind</strong> the left-hand side to a temporary name (a variable) that exists only for the scope of the next expression.</p>
-<section id="how-the-bind-pipe-works" class="level3">
-<h3 class="anchored" data-anchor-id="how-the-bind-pipe-works">How the Bind Pipe Works</h3>
-<p>Like the pipe operator, the bind pipe is implemented purely as grammar. When the parser encounters the bind pipe syntax <code>x |&gt; y =&gt; expr</code>, it follows a specific transformation rule:</p>
+<section id="tracing-the-first-discussion" class="level3">
+<h3 class="anchored" data-anchor-id="tracing-the-first-discussion">Tracing the First Discussion</h3>
+<p>Curiosity piqued, I did some digging to find out when this was first proposed. According to my investigation, I traced it back to January 2021. Based on the <a href="https://stat.ethz.ch/pipermail/r-devel/2021-January/080396.html">R-devel mailing list archives</a>, this is one of the earliest discussions I could find regarding the operator, where it was debated as a way to provide a more flexible “binding” mechanism.</p>
+</section>
+</section>
+<section id="the-experimental-pipe-bind" class="level2">
+<h2 class="anchored" data-anchor-id="the-experimental-pipe-bind">The Experimental Pipe-Bind <code>=&gt;</code></h2>
+<p>The experimental pipe bind (<code>=&gt;</code>) is designed to clear the structural hurdles inherent in the native pipe. If the standard pipe is about <strong>redirection</strong>, the pipe bind is about <strong>lexical binding</strong>.</p>
+<p>Instead of a “blind” injection into a single argument slot, the pipe bind allows you to <strong>bind</strong> the left-hand side to a temporary name (a variable) that exists only for the scope of the next expression.</p>
+<section id="how-the-pipe-bind-works" class="level3">
+<h3 class="anchored" data-anchor-id="how-the-pipe-bind-works">How the Pipe Bind Works</h3>
+<p>Like the pipe operator, the pipe bind is implemented purely as grammar. When the parser encounters the pipe bind syntax <code>x |&gt; y =&gt; expr</code>, it follows a specific transformation rule:</p>
 <ol type="1">
 <li>It takes the object on the left (<code>x</code>).</li>
 <li>It creates a temporary, anonymous function where the name you provided (<code>y</code>) is the argument.</li>
@@ -335,7 +359,9 @@ background-size: cover;
 <li>It immediately calls that function using <code>x</code> as the input.</li>
 </ol>
 <p>Essentially, <code>x |&gt; y =&gt; expr</code> is a syntactic shortcut for:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>(<span class="cf">function</span>(y) expr)(x)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>(<span class="cf">function</span>(y) expr)(x)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -347,7 +373,9 @@ Important
 </div>
 <div class="callout-body-container callout-body">
 <p>To try out this feature in R, you must first set the following environment variable:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="st">"_R_USE_PIPEBIND_"</span> <span class="ot">=</span> <span class="st">"TRUE"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="st">"_R_USE_PIPEBIND_"</span> <span class="ot">=</span> <span class="st">"TRUE"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <p>Otherwise, you will encounter the following error when attempting to use the operator:</p>
 <p><code>Error: '=&gt;' is disabled; set '_R_USE_PIPEBIND_' envvar to a true value to enable it (&lt;input&gt;:1:11)</code></p>
 </div>
@@ -355,10 +383,12 @@ Important
 </section>
 <section id="how-it-overcomes-the-pipes-hurdles" class="level3">
 <h3 class="anchored" data-anchor-id="how-it-overcomes-the-pipes-hurdles">How it Overcomes the Pipe’s Hurdles</h3>
-<p>The bind pipe transforms the logic from structural rewriting to a temporary local scope:</p>
-<ul>
-<li><p><strong>Multiple Uses:</strong> Since the data is bound to a name, you can reference it as many times as you want.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">12</span>, <span class="dv">9</span>, <span class="dv">11</span>, <span class="dv">13</span>, <span class="dv">10</span>)</span>
+<p>The pipe bind transforms the logic from structural rewriting to a temporary local scope:</p>
+<section id="multiple-uses" class="level4">
+<h4 class="anchored" data-anchor-id="multiple-uses">Multiple Uses</h4>
+<p>Since the data is bound to a name, you can reference it as many times as you want.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">12</span>, <span class="dv">9</span>, <span class="dv">11</span>, <span class="dv">13</span>, <span class="dv">10</span>)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>data <span class="sc">|&gt;</span> x <span class="sc">=&gt;</span> <span class="fu">data.frame</span>(</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">value =</span> x, </span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">diff =</span> x <span class="sc">-</span> <span class="fu">mean</span>(x)</span>
@@ -368,13 +398,23 @@ Important
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2     9   -2</span></span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3    11    0</span></span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4    13    2</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5    10   -1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p><strong>Positional Freedom:</strong> Because the right-hand side is treated as a scope where the data is simply a variable, you can use the bound data in any positional argument without the need to specify a parameter name (like <code>x = _</code>).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># No need for named arguments; the variable can be passed positionally</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5    10   -1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="positional-freedom" class="level4">
+<h4 class="anchored" data-anchor-id="positional-freedom">Positional Freedom</h4>
+<p>Because the right-hand side is treated as a scope where the data is simply a variable, you can use the bound data in any positional argument without the need to specify a parameter name (like <code>x = _</code>).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># No need for named arguments; the variable can be passed positionally</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="st">"hello"</span> <span class="sc">|&gt;</span> string <span class="sc">=&gt;</span> <span class="fu">gsub</span>(<span class="st">"h"</span>, <span class="st">"j"</span>, string)</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] "jello"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p><strong>Expression Freedom:</strong> The bind pipe does not require a formal function call on the right-hand side. You can pipe directly into raw expressions or braced blocks, bypassing the need for a strict function structure.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">12</span>, <span class="dv">9</span>, <span class="dv">11</span>, <span class="dv">13</span>, <span class="dv">10</span>, <span class="dv">14</span>, <span class="dv">8</span>, <span class="dv">12</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] "jello"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="expression-freedom" class="level4">
+<h4 class="anchored" data-anchor-id="expression-freedom">Expression Freedom</h4>
+<p>The pipe bind does not require a formal function call on the right-hand side. You can pipe directly into raw expressions or braced blocks, bypassing the need for a strict function structure.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">12</span>, <span class="dv">9</span>, <span class="dv">11</span>, <span class="dv">13</span>, <span class="dv">10</span>, <span class="dv">14</span>, <span class="dv">8</span>, <span class="dv">12</span>)</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>data <span class="sc">|&gt;</span> x <span class="sc">=&gt;</span> {</span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    x_sum <span class="ot">&lt;-</span> <span class="fu">sum</span>(x)</span>
@@ -382,23 +422,26 @@ Important
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    x_sum<span class="sc">/</span>n</span>
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 11.125</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Because the bind pipe binds the incoming lhs to a specific variable name, the rhs is no longer restricted to being a function call. It can be any valid R expression.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>mtcars[mtcars<span class="sc">$</span>cyl <span class="sc">==</span> <span class="dv">9</span>, ] <span class="sc">|&gt;</span> df <span class="sc">=&gt;</span> {</span>
+</div>
+<p>Because the pipe bind binds the incoming lhs to a specific variable name, the rhs is no longer restricted to being a function call. It can be any valid R expression.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>mtcars[mtcars<span class="sc">$</span>cyl <span class="sc">==</span> <span class="dv">9</span>, ] <span class="sc">|&gt;</span> df <span class="sc">=&gt;</span> {</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">nrow</span>(df) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">lm</span>(mpg <span class="sc">~</span> wt, <span class="at">data =</span> df)</span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">message</span>(<span class="st">"No records found to run the model."</span>)</span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    }</span>
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; No records found to run the model.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-</ul>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; No records found to run the model.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
 </section>
 </section>
 <section id="conclusion-a-glimpse-into-rs-future" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion-a-glimpse-into-rs-future">Conclusion: A Glimpse into R’s Future</h2>
-<p>The <code>=&gt;</code> operator is an interesting addition to R’s syntax. While the native pipe <code>|&gt;</code> streamlines linear code through simple rewriting, the bind pipe addresses the need for more flexible plumbing: referencing the same dataset multiple times and performing inline operations.</p>
+<p>The <code>=&gt;</code> operator is an interesting addition to R’s syntax. While the native pipe <code>|&gt;</code> streamlines linear code through simple rewriting, the pipe bind addresses the need for more flexible plumbing: referencing the same dataset multiple times and performing inline operations.</p>
 <p>However, it is important to remember that this is an experimental feature. It remains hidden behind an environment variable because it is still a “draft” within the language’s source code. There is no guarantee that it will be promoted to a stable, production-ready release. If it does eventually graduate, both its syntax and its underlying behavior may change to ensure long-term compatibility with the rest of the language.</p>
-<p>For now, the bind pipe offers a look at how R might further bridge the gap between simple piping and complex functional programming. Whether it remains hidden in the source code or becomes a standard feature, it demonstrates a thoughtful approach to making R’s grammar more expressive for modern data workflows.</p>
+<p>For now, the pipe bind offers a look at how R might further bridge the gap between simple piping and complex functional programming. Whether it remains hidden in the source code or becomes a standard feature, it demonstrates a thoughtful approach to making R’s grammar more expressive for modern data workflows.</p>
 
 
 </section>
