@@ -10,13 +10,13 @@ about:
     - icon: github
       text: GitHub
       href: https://github.com/ankonyeni
-    - icon: rss
-      text: RSS
-      href: https://ankonyeni.github.io/notes-from-athi/index.xml
+    - icon: link-45deg
+      text: R-bloggers
+      href: https://www.r-bloggers.com
 
 ---
 Hi, I’m Athenkosi Nkonyeni.
 
-I write about things I'm interested in, especially around programming, data standards, and digital transformation.
+I write about things I'm interested in, especially around data standards, data modeling, computer science and digital transformation.
 
 This blog is an outlet for what I'm thinking about and learning. I use it to document ideas, experiments, and lessons I want to remember and build on over time.

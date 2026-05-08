@@ -28,14 +28,11 @@ website:
       - icon: github
         href: https://github.com/ankonyeni/notes-from-athi
         aria-label: GitHub repository
-      - icon: rss
-        href: index.xml
-        aria-label: RSS feed
   page-footer:
     left: "© 2026 Athenkosi Nkonyeni"
     right:
-      - text: RSS
-        href: index.xml
+      - text: R-bloggers
+        href: https://www.r-bloggers.com
       - text: GitHub
         href: https://github.com/ankonyeni/notes-from-athi
 format:
