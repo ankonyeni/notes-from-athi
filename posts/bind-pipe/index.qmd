@@ -1,7 +1,7 @@
 ---
 title: "R's Experimental `=>` Operator"
 subtitle: "Beyond the native pipe"
-description: "A deep dive into R's experimental pipe-bind operator"
+description: "An exploration of R's experimental pipe-bind operator and how it extends pipeline-style programming."
 date: "2026-05-01"
 categories: [R, Programming]
 image: "image.png"

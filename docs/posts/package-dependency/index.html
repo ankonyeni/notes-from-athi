@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Athenkosi Nkonyeni">
+<meta name="dcterms.date" content="2026-05-09">
+<meta name="description" content="Exploring the hidden complexity of R package dependencies, indirect dependencies, version requirements, system requirements, and why dependency graphs matter.">
+
+<title>Seeing Beyond DESCRIPTION – Notes from Athi</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-fde6028973a8af2afb1d77be65601ea1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>
+
+      .quarto-title-block .quarto-title-banner h1,
+      .quarto-title-block .quarto-title-banner h2,
+      .quarto-title-block .quarto-title-banner h3,
+      .quarto-title-block .quarto-title-banner h4,
+      .quarto-title-block .quarto-title-banner h5,
+      .quarto-title-block .quarto-title-banner h6
+      {
+        color: #fff8e8;
+      }
+
+      .quarto-title-block .quarto-title-banner {
+        color: #fff8e8;
+background-image: url(image.png);
+background-size: cover;
+      }
+</style>
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="Seeing Beyond DESCRIPTION – Notes from Athi">
+<meta property="og:description" content="Exploring the hidden complexity of R package dependencies, indirect dependencies, version requirements, system requirements, and why dependency graphs matter.">
+<meta property="og:image" content="https://ankonyeni.github.io/notes-from-athi/posts/package-dependency/image.png">
+<meta property="og:site_name" content="Notes from Athi">
+<meta property="og:image:height" content="941">
+<meta property="og:image:width" content="1672">
+<meta name="twitter:title" content="Seeing Beyond DESCRIPTION – Notes from Athi">
+<meta name="twitter:description" content="Exploring the hidden complexity of R package dependencies, indirect dependencies, version requirements, system requirements, and why dependency graphs matter.">
+<meta name="twitter:image" content="https://ankonyeni.github.io/notes-from-athi/posts/package-dependency/image.png">
+<meta name="twitter:image-height" content="941">
+<meta name="twitter:image-width" content="1672">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Notes from Athi</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../archive.html"> 
+<span class="menu-text">Archive</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/ankonyeni/notes-from-athi"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Seeing Beyond <code>DESCRIPTION</code></h1>
+            <p class="subtitle lead">The Hidden Complexity of R Package Dependencies</p>
+                  <div>
+        <div class="description">
+          Exploring the hidden complexity of R package dependencies, indirect dependencies, version requirements, system requirements, and why dependency graphs matter.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">R</div>
+                <div class="quarto-category">Programming</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Athenkosi Nkonyeni </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">May 9, 2026</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a>
+  <ul class="collapse">
+  <li><a href="#tldr" id="toc-tldr" class="nav-link" data-scroll-target="#tldr">TL;DR</a></li>
+  </ul></li>
+  <li><a href="#losing-control-of-your-packages-dependency-footprint" id="toc-losing-control-of-your-packages-dependency-footprint" class="nav-link" data-scroll-target="#losing-control-of-your-packages-dependency-footprint">Losing Control of Your Package’s Dependency Footprint</a></li>
+  <li><a href="#not-all-direct-dependencies-have-the-same-weight" id="toc-not-all-direct-dependencies-have-the-same-weight" class="nav-link" data-scroll-target="#not-all-direct-dependencies-have-the-same-weight">Not All Direct Dependencies Have the Same Weight</a></li>
+  <li><a href="#the-hidden-depth-of-version-requirements" id="toc-the-hidden-depth-of-version-requirements" class="nav-link" data-scroll-target="#the-hidden-depth-of-version-requirements">The Hidden Depth of Version Requirements</a></li>
+  <li><a href="#direct-vs.-indirect-dependencies" id="toc-direct-vs.-indirect-dependencies" class="nav-link" data-scroll-target="#direct-vs.-indirect-dependencies">Direct vs.&nbsp;Indirect Dependencies</a></li>
+  <li><a href="#system-requirements-and-compilation-complexity" id="toc-system-requirements-and-compilation-complexity" class="nav-link" data-scroll-target="#system-requirements-and-compilation-complexity">System Requirements and Compilation Complexity</a></li>
+  <li><a href="#why-dependency-graphs-matter" id="toc-why-dependency-graphs-matter" class="nav-link" data-scroll-target="#why-dependency-graphs-matter">Why Dependency Graphs Matter</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<section id="tldr" class="level3">
+<h3 class="anchored" data-anchor-id="tldr">TL;DR</h3>
+<p>The <code>DESCRIPTION</code> file shows the surface of your dependencies, not the full structure beneath it. To make that hidden structure easier to explore, I created <a href="https://pkgmap.app">pkgmap.app</a>, a web application for visualising the full dependency graph behind an R package.</p>
+<p>The goal is simple: instead of seeing only the packages listed directly in <code>DESCRIPTION</code>, you can see the wider dependency chain, including indirect dependencies, version requirements, compilation requirements, and system-level complexity.</p>
+<p>The <code>DESCRIPTION</code> file shows the surface of your dependencies, not the full structure beneath it.</p>
+<p>When we think about package dependencies in R, we often think about the packages listed in the <code>Imports</code>, <code>Depends</code>, or <code>Suggests</code> fields of a <code>DESCRIPTION</code> file. At first glance, it feels straightforward: these are the packages my package depends on.</p>
+<p>But that view is incomplete.</p>
+<p>In reality, package dependencies form a graph, not a flat list.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 356.19 260.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 256)">
+<title>dependencies</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="234.6" cy="-234" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="234.6" y="-229.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="173.6" cy="-162" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="173.6" y="-157.8" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A-&gt;B</title>
+<path fill="none" stroke="black" d="M220.14,-216.41C212.54,-207.69 203.09,-196.85 194.69,-187.21"></path>
+<polygon fill="black" stroke="black" points="197.16,-184.71 187.95,-179.47 191.88,-189.31 197.16,-184.71"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="295.6" cy="-162" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="295.6" y="-157.8" font-family="Times,serif" font-size="14.00">Package C</text>
+</g>
+<!-- A&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>A-&gt;C</title>
+<path fill="none" stroke="black" d="M249.05,-216.41C256.65,-207.69 266.1,-196.85 274.5,-187.21"></path>
+<polygon fill="black" stroke="black" points="277.31,-189.31 281.24,-179.47 272.04,-184.71 277.31,-189.31"></polygon>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="52.6" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="52.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package D</text>
+</g>
+<!-- B&#45;&gt;D -->
+<g id="edge3" class="edge">
+<title>B-&gt;D</title>
+<path fill="none" stroke="black" d="M147.94,-146.15C130.21,-135.9 106.43,-122.14 87.05,-110.93"></path>
+<polygon fill="black" stroke="black" points="88.63,-107.8 78.22,-105.82 85.12,-113.86 88.63,-107.8"></polygon>
+</g>
+<!-- E -->
+<g id="node5" class="node">
+<title>E</title>
+<ellipse fill="none" stroke="black" cx="174.6" cy="-90" rx="51.54" ry="18"></ellipse>
+<text text-anchor="middle" x="174.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package E</text>
+</g>
+<!-- B&#45;&gt;E -->
+<g id="edge4" class="edge">
+<title>B-&gt;E</title>
+<path fill="none" stroke="black" d="M173.84,-143.7C173.95,-135.98 174.09,-126.71 174.21,-118.11"></path>
+<polygon fill="black" stroke="black" points="177.71,-118.15 174.35,-108.1 170.71,-118.05 177.71,-118.15"></polygon>
+</g>
+<!-- F -->
+<g id="node6" class="node">
+<title>F</title>
+<ellipse fill="none" stroke="black" cx="295.6" cy="-90" rx="50.99" ry="18"></ellipse>
+<text text-anchor="middle" x="295.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package F</text>
+</g>
+<!-- C&#45;&gt;F -->
+<g id="edge5" class="edge">
+<title>C-&gt;F</title>
+<path fill="none" stroke="black" d="M295.6,-143.7C295.6,-135.98 295.6,-126.71 295.6,-118.11"></path>
+<polygon fill="black" stroke="black" points="299.1,-118.1 295.6,-108.1 292.1,-118.1 299.1,-118.1"></polygon>
+</g>
+<!-- G -->
+<g id="node7" class="node">
+<title>G</title>
+<ellipse fill="none" stroke="black" cx="295.6" cy="-18" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="295.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package G</text>
+</g>
+<!-- F&#45;&gt;G -->
+<g id="edge6" class="edge">
+<title>F-&gt;G</title>
+<path fill="none" stroke="black" d="M295.6,-71.7C295.6,-63.98 295.6,-54.71 295.6,-46.11"></path>
+<polygon fill="black" stroke="black" points="299.1,-46.1 295.6,-36.1 292.1,-46.1 299.1,-46.1"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Every package you depend on has its own dependencies, and those dependencies may have dependencies of their own. What appears to be a small and lightweight package at the surface can ultimately pull in a surprisingly large dependency chain with additional version requirements, compilation requirements, system libraries, and external tooling.</p>
+<p>This realization is what motivated me to build a web application for exploring package dependency graphs. Rather than showing only direct dependencies, the tool visualizes the <em>entire dependency chain</em>, making it easier to understand what a package truly depends on.</p>
+</section>
+</section>
+<section id="losing-control-of-your-packages-dependency-footprint" class="level1">
+<h1>Losing Control of Your Package’s Dependency Footprint</h1>
+<p>One of the most important and often overlooked realities of package development is this:</p>
+<blockquote class="blockquote">
+<p>The moment you declare a dependency on another package, you partially lose control over your package’s overall dependency footprint.</p>
+</blockquote>
+<p>At first, this may sound unintuitive. After all, <em>you</em> are the one deciding which packages to include in your <code>DESCRIPTION</code> file.</p>
+<p>But that control only applies to the dependency decision you make today. It does not fully control what that dependency may become tomorrow.</p>
+<p>Suppose your package depends on only one package, and that package currently has no dependencies of its own.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 215.35 138.83" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 134.83)">
+<title>simple_dependency_today</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="103.68" cy="-112.83" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="103.68" y="-108.63" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="103.68" cy="-29.42" rx="103.85" ry="29.33"></ellipse>
+<text text-anchor="middle" x="103.68" y="-33.62" font-family="Times,serif" font-size="14.00">Package B</text>
+<text text-anchor="middle" x="103.68" y="-16.82" font-family="Times,serif" font-size="14.00">No dependencies today</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A-&gt;B</title>
+<path fill="none" stroke="black" d="M103.68,-94.57C103.68,-87.04 103.68,-77.88 103.68,-68.88"></path>
+<polygon fill="black" stroke="black" points="107.18,-68.87 103.68,-58.87 100.18,-68.87 107.18,-68.87"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>At this point, the dependency structure looks simple. But that simplicity is not something you completely control. It depends on the future decisions of <code>Package B</code>’s maintainer.</p>
+<p>If the maintainer later adds new dependencies, introduces compiled code, raises the minimum R version, or adds system requirements, your package inherits those consequences.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 329.84 210.83" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 206.83)">
+<title>simple_dependency_tomorrow</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="142.77" cy="-184.83" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="142.77" y="-180.63" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="142.77" cy="-112.83" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="142.77" y="-108.63" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A-&gt;B</title>
+<path fill="none" stroke="black" d="M142.77,-166.53C142.77,-158.81 142.77,-149.54 142.77,-140.94"></path>
+<polygon fill="black" stroke="black" points="146.27,-140.94 142.77,-130.94 139.27,-140.94 146.27,-140.94"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="57.77" cy="-29.42" rx="57.53" ry="29.33"></ellipse>
+<text text-anchor="middle" x="57.77" y="-33.62" font-family="Times,serif" font-size="14.00">Package C</text>
+<text text-anchor="middle" x="57.77" y="-16.82" font-family="Times,serif" font-size="14.00">Added later</text>
+</g>
+<!-- B&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>B-&gt;C</title>
+<path fill="none" stroke="black" d="M125.97,-95.75C116.12,-86.31 103.31,-74.03 91.45,-62.68"></path>
+<polygon fill="black" stroke="black" points="93.87,-60.15 84.23,-55.76 89.03,-65.21 93.87,-60.15"></polygon>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="227.77" cy="-29.42" rx="94.14" ry="29.33"></ellipse>
+<text text-anchor="middle" x="227.77" y="-33.62" font-family="Times,serif" font-size="14.00">System Requirement</text>
+<text text-anchor="middle" x="227.77" y="-16.82" font-family="Times,serif" font-size="14.00">Added later</text>
+</g>
+<!-- B&#45;&gt;D -->
+<g id="edge3" class="edge">
+<title>B-&gt;D</title>
+<path fill="none" stroke="black" d="M159.56,-95.75C168.85,-86.85 180.76,-75.44 192.02,-64.66"></path>
+<polygon fill="black" stroke="black" points="194.49,-67.14 199.29,-57.69 189.65,-62.08 194.49,-67.14"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Your package did not change, but its dependency footprint did.</p>
+<p>This is why dependency chains should be treated as dynamic rather than fixed. Even when your dependency graph is shallow today, it is not guaranteed to remain shallow tomorrow.</p>
+<p>The moment your package depends on another package, you also inherit the architectural decisions made by that package and its future dependency choices.</p>
+<p>This means another package maintainer can indirectly change the complexity of <em>your</em> package without you modifying a single line of code.</p>
+<p>This creates an important distinction between:</p>
+<ul>
+<li>The dependencies you <em>explicitly chose</em></li>
+<li>The dependencies your package <em>effectively inherits</em></li>
+</ul>
+<p>Those two things are not the same.</p>
+</section>
+<section id="not-all-direct-dependencies-have-the-same-weight" class="level1">
+<h1>Not All Direct Dependencies Have the Same Weight</h1>
+<p>A <code>DESCRIPTION</code> file also hides an important asymmetry: your direct dependencies do not all have the same impact on your overall dependency footprint.</p>
+<p>When you look at a <code>DESCRIPTION</code> file, each dependency appears as just another package name in a list:</p>
+<pre class="text"><code>Imports:
+  Package A,
+  Package B,
+  Package C</code></pre>
+<p>But those package names can represent very different levels of downstream complexity.</p>
+<div class="cell" data-eval="true" data-fig-height="4" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="384" viewbox="0.00 0.00 833.19 188.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 184)">
+<title>dependency_weight</title>
+<!-- P -->
+<g id="node1" class="node">
+<title>P</title>
+<ellipse fill="none" stroke="black" cx="296.6" cy="-162" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="296.6" y="-157.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- A -->
+<g id="node2" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="173.6" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="173.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package A</text>
+</g>
+<!-- P&#45;&gt;A -->
+<g id="edge1" class="edge">
+<title>P-&gt;A</title>
+<path fill="none" stroke="black" d="M269.3,-145.46C251.34,-135.24 227.67,-121.77 208.36,-110.78"></path>
+<polygon fill="black" stroke="black" points="209.98,-107.68 199.56,-105.77 206.52,-113.76 209.98,-107.68"></polygon>
+</g>
+<!-- B -->
+<g id="node3" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="296.6" cy="-90" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="296.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- P&#45;&gt;B -->
+<g id="edge2" class="edge">
+<title>P-&gt;B</title>
+<path fill="none" stroke="black" d="M296.6,-143.7C296.6,-135.98 296.6,-126.71 296.6,-118.11"></path>
+<polygon fill="black" stroke="black" points="300.1,-118.1 296.6,-108.1 293.1,-118.1 300.1,-118.1"></polygon>
+</g>
+<!-- C -->
+<g id="node4" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="536.6" cy="-90" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="536.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package C</text>
+</g>
+<!-- P&#45;&gt;C -->
+<g id="edge3" class="edge">
+<title>P-&gt;C</title>
+<path fill="none" stroke="black" d="M339.78,-148.4C381.6,-136.21 444.89,-117.75 488.34,-105.07"></path>
+<polygon fill="black" stroke="black" points="489.5,-108.38 498.12,-102.22 487.54,-101.66 489.5,-108.38"></polygon>
+</g>
+<!-- D -->
+<g id="node5" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="52.6" cy="-18" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="52.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package D</text>
+</g>
+<!-- A&#45;&gt;D -->
+<g id="edge4" class="edge">
+<title>A-&gt;D</title>
+<path fill="none" stroke="black" d="M147.94,-74.15C130.21,-63.9 106.43,-50.14 87.05,-38.93"></path>
+<polygon fill="black" stroke="black" points="88.63,-35.8 78.22,-33.82 85.12,-41.86 88.63,-35.8"></polygon>
+</g>
+<!-- E -->
+<g id="node6" class="node">
+<title>E</title>
+<ellipse fill="none" stroke="black" cx="295.6" cy="-18" rx="51.54" ry="18"></ellipse>
+<text text-anchor="middle" x="295.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package E</text>
+</g>
+<!-- A&#45;&gt;E -->
+<g id="edge5" class="edge">
+<title>A-&gt;E</title>
+<path fill="none" stroke="black" d="M199.47,-74.15C217.34,-63.9 241.32,-50.14 260.86,-38.93"></path>
+<polygon fill="black" stroke="black" points="262.83,-41.84 269.76,-33.82 259.35,-35.76 262.83,-41.84"></polygon>
+</g>
+<!-- F -->
+<g id="node7" class="node">
+<title>F</title>
+<ellipse fill="none" stroke="black" cx="174.6" cy="-18" rx="50.99" ry="18"></ellipse>
+<text text-anchor="middle" x="174.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package F</text>
+</g>
+<!-- A&#45;&gt;F -->
+<g id="edge6" class="edge">
+<title>A-&gt;F</title>
+<path fill="none" stroke="black" d="M173.84,-71.7C173.95,-63.98 174.09,-54.71 174.21,-46.11"></path>
+<polygon fill="black" stroke="black" points="177.71,-46.15 174.35,-36.1 170.71,-46.05 177.71,-46.15"></polygon>
+</g>
+<!-- B&#45;&gt;E -->
+<g id="edge7" class="edge">
+<title>B-&gt;E</title>
+<path fill="none" stroke="black" d="M296.35,-71.7C296.24,-63.98 296.11,-54.71 295.98,-46.11"></path>
+<polygon fill="black" stroke="black" points="299.48,-46.05 295.84,-36.1 292.48,-46.15 299.48,-46.05"></polygon>
+</g>
+<!-- B&#45;&gt;F -->
+<g id="edge8" class="edge">
+<title>B-&gt;F</title>
+<path fill="none" stroke="black" d="M270.72,-74.15C252.85,-63.9 228.87,-50.14 209.34,-38.93"></path>
+<polygon fill="black" stroke="black" points="210.85,-35.76 200.43,-33.82 207.36,-41.84 210.85,-35.76"></polygon>
+</g>
+<!-- G -->
+<g id="node8" class="node">
+<title>G</title>
+<ellipse fill="none" stroke="black" cx="772.6" cy="-18" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="772.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package G</text>
+</g>
+<!-- C&#45;&gt;G -->
+<g id="edge9" class="edge">
+<title>C-&gt;G</title>
+<path fill="none" stroke="black" d="M574.78,-77.68C615.53,-65.59 680.19,-46.41 724.42,-33.29"></path>
+<polygon fill="black" stroke="black" points="725.49,-36.62 734.08,-30.42 723.5,-29.91 725.49,-36.62"></polygon>
+</g>
+<!-- H -->
+<g id="node9" class="node">
+<title>H</title>
+<ellipse fill="none" stroke="black" cx="417.6" cy="-18" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="417.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package H</text>
+</g>
+<!-- C&#45;&gt;H -->
+<g id="edge10" class="edge">
+<title>C-&gt;H</title>
+<path fill="none" stroke="black" d="M511.36,-74.15C493.93,-63.9 470.54,-50.14 451.48,-38.93"></path>
+<polygon fill="black" stroke="black" points="453.19,-35.88 442.8,-33.82 449.64,-41.91 453.19,-35.88"></polygon>
+</g>
+<!-- I -->
+<g id="node10" class="node">
+<title>I</title>
+<ellipse fill="none" stroke="black" cx="536.6" cy="-18" rx="48.68" ry="18"></ellipse>
+<text text-anchor="middle" x="536.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package I</text>
+</g>
+<!-- C&#45;&gt;I -->
+<g id="edge11" class="edge">
+<title>C-&gt;I</title>
+<path fill="none" stroke="black" d="M536.6,-71.7C536.6,-63.98 536.6,-54.71 536.6,-46.11"></path>
+<polygon fill="black" stroke="black" points="540.1,-46.1 536.6,-36.1 533.1,-46.1 540.1,-46.1"></polygon>
+</g>
+<!-- J -->
+<g id="node11" class="node">
+<title>J</title>
+<ellipse fill="none" stroke="black" cx="652.6" cy="-18" rx="49.26" ry="18"></ellipse>
+<text text-anchor="middle" x="652.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package J</text>
+</g>
+<!-- C&#45;&gt;J -->
+<g id="edge12" class="edge">
+<title>C-&gt;J</title>
+<path fill="none" stroke="black" d="M561.48,-73.98C578.42,-63.76 601.01,-50.13 619.47,-38.99"></path>
+<polygon fill="black" stroke="black" points="621.4,-41.92 628.15,-33.75 617.78,-35.92 621.4,-41.92"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Package A, Package B, and Package C are all direct dependencies, but they do not carry the same weight.</p>
+<p>Some packages bring along many additional dependencies that are unique to them. Others may depend mostly on packages that are already present elsewhere in the dependency graph.</p>
+<p>That distinction matters.</p>
+<p>If Package C introduces several dependencies that no other package needs, then adding Package C meaningfully increases your package’s dependency footprint. But if Package B depends mostly on packages already pulled in by Package A, then its marginal impact may be much smaller.</p>
+<p>In other words, the cost of a dependency is not only whether it appears in your <code>DESCRIPTION</code> file. The real cost is how much new dependency structure it adds to the full graph.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 578.67 188.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 184)">
+<title>marginal_dependency_cost</title>
+<!-- P -->
+<g id="node1" class="node">
+<title>P</title>
+<ellipse fill="none" stroke="black" cx="221.53" cy="-162" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="221.53" y="-157.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- A -->
+<g id="node2" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="160.53" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="160.53" y="-85.8" font-family="Times,serif" font-size="14.00">Package A</text>
+</g>
+<!-- P&#45;&gt;A -->
+<g id="edge1" class="edge">
+<title>P-&gt;A</title>
+<path fill="none" stroke="black" d="M207.07,-144.41C199.47,-135.69 190.02,-124.85 181.62,-115.21"></path>
+<polygon fill="black" stroke="black" points="184.09,-112.71 174.88,-107.47 178.81,-117.31 184.09,-112.71"></polygon>
+</g>
+<!-- B -->
+<g id="node3" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="283.53" cy="-90" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="283.53" y="-85.8" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- P&#45;&gt;B -->
+<g id="edge2" class="edge">
+<title>P-&gt;B</title>
+<path fill="none" stroke="black" d="M236.22,-144.41C243.94,-135.69 253.55,-124.85 262.09,-115.21"></path>
+<polygon fill="black" stroke="black" points="264.93,-117.28 268.94,-107.47 259.69,-112.64 264.93,-117.28"></polygon>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="283.53" cy="-18" rx="88.56" ry="18"></ellipse>
+<text text-anchor="middle" x="283.53" y="-13.8" font-family="Times,serif" font-size="14.00">Shared Dependency</text>
+</g>
+<!-- A&#45;&gt;D -->
+<g id="edge3" class="edge">
+<title>A-&gt;D</title>
+<path fill="none" stroke="black" d="M186.61,-74.15C203.9,-64.32 226.86,-51.25 246.08,-40.31"></path>
+<polygon fill="black" stroke="black" points="247.94,-43.28 254.9,-35.29 244.48,-37.19 247.94,-43.28"></polygon>
+</g>
+<!-- E -->
+<g id="node5" class="node">
+<title>E</title>
+<ellipse fill="none" stroke="black" cx="88.53" cy="-18" rx="88.56" ry="18"></ellipse>
+<text text-anchor="middle" x="88.53" y="-13.8" font-family="Times,serif" font-size="14.00">Shared Dependency</text>
+</g>
+<!-- A&#45;&gt;E -->
+<g id="edge4" class="edge">
+<title>A-&gt;E</title>
+<path fill="none" stroke="black" d="M143.83,-72.76C134.82,-64.01 123.53,-53.03 113.5,-43.28"></path>
+<polygon fill="black" stroke="black" points="115.75,-40.59 106.14,-36.12 110.87,-45.6 115.75,-40.59"></polygon>
+</g>
+<!-- B&#45;&gt;D -->
+<g id="edge5" class="edge">
+<title>B-&gt;D</title>
+<path fill="none" stroke="black" d="M283.53,-71.7C283.53,-63.98 283.53,-54.71 283.53,-46.11"></path>
+<polygon fill="black" stroke="black" points="287.03,-46.1 283.53,-36.1 280.03,-46.1 287.03,-46.1"></polygon>
+</g>
+<!-- B&#45;&gt;E -->
+<g id="edge6" class="edge">
+<title>B-&gt;E</title>
+<path fill="none" stroke="black" d="M248.67,-76.49C218.45,-65.64 174.33,-49.8 140.04,-37.49"></path>
+<polygon fill="black" stroke="black" points="140.8,-34.04 130.2,-33.96 138.43,-40.63 140.8,-34.04"></polygon>
+</g>
+<!-- F -->
+<g id="node6" class="node">
+<title>F</title>
+<ellipse fill="none" stroke="black" cx="480.53" cy="-18" rx="90.28" ry="18"></ellipse>
+<text text-anchor="middle" x="480.53" y="-13.8" font-family="Times,serif" font-size="14.00">Unique Dependency</text>
+</g>
+<!-- B&#45;&gt;F -->
+<g id="edge7" class="edge">
+<title>B-&gt;F</title>
+<path fill="none" stroke="black" d="M318.75,-76.49C349.4,-65.59 394.23,-49.66 428.93,-37.33"></path>
+<polygon fill="black" stroke="black" points="430.18,-40.61 438.43,-33.96 427.83,-34.01 430.18,-40.61"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>This is why two packages can both appear as one line in <code>DESCRIPTION</code>, yet have very different effects on installation time, reproducibility, platform requirements, and maintenance risk.</p>
+<p>A flat dependency list treats every direct dependency as if it has the same weight. A dependency graph shows that they do not.</p>
+</section>
+<section id="the-hidden-depth-of-version-requirements" class="level1">
+<h1>The Hidden Depth of Version Requirements</h1>
+<p>Version requirements are not only what <em>you</em> declare. They are what your full dependency graph can support.</p>
+<p>This is an easy detail to miss because the <code>DESCRIPTION</code> file gives a very local view of your package. It tells you what <em>your package</em> claims to need directly, but it does not necessarily tell you the strongest requirement imposed by everything your package depends on indirectly.</p>
+<p>For example, suppose your package declares:</p>
+<pre class="text"><code>Depends: R (&gt;= 3.5.0)</code></pre>
+<p>At first glance, that seems clear. Your package requires R 3.5.0 or later. But that statement is only true if the rest of the dependency graph can also run on R 3.5.0.</p>
+<p>Now suppose your package depends on <code>Package B</code>, and <code>Package B</code> depends on <code>Package C</code>. If <code>Package C</code> requires R 4.1.0, then R 3.5.0 is no longer sufficient for your package to be installed and used successfully.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 142.23 233.66" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 229.66)">
+<title>downstream_r_requirement</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="67.11" cy="-196.25" rx="67.23" ry="29.33"></ellipse>
+<text text-anchor="middle" x="67.11" y="-200.45" font-family="Times,serif" font-size="14.00">Your Package</text>
+<text text-anchor="middle" x="67.11" y="-183.65" font-family="Times,serif" font-size="14.00">R &gt;= 3.5.0</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="67.11" cy="-112.83" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="67.11" y="-108.63" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A-&gt;B</title>
+<path fill="none" stroke="black" d="M67.11,-166.77C67.11,-158.48 67.11,-149.45 67.11,-141.22"></path>
+<polygon fill="black" stroke="black" points="70.61,-141.02 67.11,-131.02 63.61,-141.02 70.61,-141.02"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="67.11" cy="-29.42" rx="53.66" ry="29.33"></ellipse>
+<text text-anchor="middle" x="67.11" y="-33.62" font-family="Times,serif" font-size="14.00">Package C</text>
+<text text-anchor="middle" x="67.11" y="-16.82" font-family="Times,serif" font-size="14.00">R &gt;= 4.1.0</text>
+</g>
+<!-- B&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>B-&gt;C</title>
+<path fill="none" stroke="black" d="M67.11,-94.57C67.11,-87.04 67.11,-77.88 67.11,-68.88"></path>
+<polygon fill="black" stroke="black" points="70.61,-68.87 67.11,-58.87 63.61,-68.87 70.61,-68.87"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Your package code did not change. Your <code>DESCRIPTION</code> file did not change. Your declared minimum R version is still <code>R &gt;= 3.5.0</code>.</p>
+<p>But your <em>effective</em> minimum R version has changed because the dependency graph contains a stricter requirement downstream.</p>
+<p>This is the important distinction:</p>
+<p>Your declared requirement is what your package says directly.</p>
+<p>Your effective requirement is what the entire dependency graph needs in order to work.</p>
+<p>Those two values can be different.</p>
+<p>This can happen for many reasons. A downstream package maintainer may adopt newer language features, rely on newer runtime behavior, simplify their maintenance burden by dropping support for older R versions, or raise their minimum version for compatibility with other dependencies.</p>
+<p>New syntax is a simple example. A downstream package may decide to use the native R pipe operator, <code>|&gt;</code>, which requires R 4.1.0. Another package may use the placeholder <code>_</code> in native pipe expressions, which requires R 4.2.0. Even if your own code does not use either feature, your package can still inherit the requirement because one of your dependencies does.</p>
+<p>So the real question is not only:</p>
+<blockquote class="blockquote">
+<p>What minimum R version does my package declare?</p>
+</blockquote>
+<p>The better question is:</p>
+<blockquote class="blockquote">
+<p>What minimum R version is required by the full dependency graph?</p>
+</blockquote>
+<p>That is why looking only at the top-level <code>DESCRIPTION</code> file can be misleading. The declared requirement may describe your package in isolation, but packages are rarely installed in isolation. They are installed together with every dependency needed to make them work.</p>
+<p>So even when your own <code>DESCRIPTION</code> says <code>R &gt;= 3.5.0</code>, the actual floor may be higher. The effective minimum version is determined by the strictest requirement anywhere in the dependency graph.</p>
+<blockquote class="blockquote">
+<p>A package’s effective requirements are determined by the entire dependency chain, not just the package itself.</p>
+</blockquote>
+</section>
+<section id="direct-vs.-indirect-dependencies" class="level1">
+<h1>Direct vs.&nbsp;Indirect Dependencies</h1>
+<p>Another common misconception is that removing a direct dependency necessarily reduces the dependency complexity of a package.</p>
+<p>Suppose your package directly depends on both Package A and Package C:</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 166.07 188.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 184)">
+<title>direct_and_indirect</title>
+<!-- P -->
+<g id="node1" class="node">
+<title>P</title>
+<ellipse fill="none" stroke="black" cx="92.6" cy="-162" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="92.6" y="-157.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- A -->
+<g id="node2" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="52.6" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="52.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package A</text>
+</g>
+<!-- P&#45;&gt;A -->
+<g id="edge1" class="edge">
+<title>P-&gt;A</title>
+<path fill="none" stroke="black" d="M82.91,-144.05C78.2,-135.8 72.43,-125.7 67.19,-116.54"></path>
+<polygon fill="black" stroke="black" points="70.19,-114.73 62.19,-107.79 64.11,-118.21 70.19,-114.73"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="92.6" cy="-18" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="92.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package C</text>
+</g>
+<!-- P&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>P-&gt;C</title>
+<path fill="none" stroke="black" d="M101.73,-143.88C106.6,-133.76 112.1,-120.51 114.6,-108 117.72,-92.31 117.72,-87.69 114.6,-72 112.81,-63.01 109.46,-53.64 105.91,-45.32"></path>
+<polygon fill="black" stroke="black" points="109.05,-43.77 101.73,-36.12 102.68,-46.67 109.05,-43.77"></polygon>
+</g>
+<!-- A&#45;&gt;C -->
+<g id="edge3" class="edge">
+<title>A-&gt;C</title>
+<path fill="none" stroke="black" d="M62.28,-72.05C67,-63.8 72.77,-53.7 78,-44.54"></path>
+<polygon fill="black" stroke="black" points="81.08,-46.21 83,-35.79 75,-42.73 81.08,-46.21"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Now imagine you remove Package C from your own direct dependencies.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 138.94 188.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 184)">
+<title>indirect_only</title>
+<!-- P -->
+<g id="node1" class="node">
+<title>P</title>
+<ellipse fill="none" stroke="black" cx="65.47" cy="-162" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="65.47" y="-157.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- A -->
+<g id="node2" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="65.47" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="65.47" y="-85.8" font-family="Times,serif" font-size="14.00">Package A</text>
+</g>
+<!-- P&#45;&gt;A -->
+<g id="edge1" class="edge">
+<title>P-&gt;A</title>
+<path fill="none" stroke="black" d="M65.47,-143.7C65.47,-135.98 65.47,-126.71 65.47,-118.11"></path>
+<polygon fill="black" stroke="black" points="68.97,-118.1 65.47,-108.1 61.97,-118.1 68.97,-118.1"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="65.47" cy="-18" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="65.47" y="-13.8" font-family="Times,serif" font-size="14.00">Package C</text>
+</g>
+<!-- A&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>A-&gt;C</title>
+<path fill="none" stroke="black" d="M65.47,-71.7C65.47,-63.98 65.47,-54.71 65.47,-46.11"></path>
+<polygon fill="black" stroke="black" points="68.97,-46.1 65.47,-36.1 61.97,-46.1 68.97,-46.1"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>At first glance, it seems like your dependency footprint has been reduced.</p>
+<p>But Package C is still part of your dependency graph because Package A still depends on it.</p>
+<p>The package did not disappear — its position in the graph simply changed.</p>
+<p>Instead of being a direct dependency, it became an indirect dependency.</p>
+<p>This is why looking only at <code>DESCRIPTION</code> can be misleading. A dependency graph makes the difference immediately visible.</p>
+</section>
+<section id="system-requirements-and-compilation-complexity" class="level1">
+<h1>System Requirements and Compilation Complexity</h1>
+<p>Your package itself may:</p>
+<ul>
+<li>Contain no compiled code</li>
+<li>Have no system requirements</li>
+<li>Require no external runtimes</li>
+<li>Appear completely platform-independent</li>
+</ul>
+<p>Yet your package can still inherit those complexities from downstream dependencies.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 428.72 305.66" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 301.66)">
+<title>system_requirements</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="193.2" cy="-268.25" rx="83.78" ry="29.33"></ellipse>
+<text text-anchor="middle" x="193.2" y="-272.45" font-family="Times,serif" font-size="14.00">Your Package</text>
+<text text-anchor="middle" x="193.2" y="-255.65" font-family="Times,serif" font-size="14.00">No compiled code</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="193.2" cy="-184.83" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="193.2" y="-180.63" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A-&gt;B</title>
+<path fill="none" stroke="black" d="M193.2,-238.77C193.2,-230.48 193.2,-221.45 193.2,-213.22"></path>
+<polygon fill="black" stroke="black" points="196.7,-213.02 193.2,-203.02 189.7,-213.02 196.7,-213.02"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="88.2" cy="-101.42" rx="88.4" ry="29.33"></ellipse>
+<text text-anchor="middle" x="88.2" y="-105.62" font-family="Times,serif" font-size="14.00">Package C</text>
+<text text-anchor="middle" x="88.2" y="-88.82" font-family="Times,serif" font-size="14.00">C/C++ compilation</text>
+</g>
+<!-- B&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>B-&gt;C</title>
+<path fill="none" stroke="black" d="M172.95,-168.13C160.79,-158.7 144.84,-146.34 130.07,-134.88"></path>
+<polygon fill="black" stroke="black" points="132.07,-132 122.02,-128.64 127.78,-137.53 132.07,-132"></polygon>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="299.2" cy="-101.42" rx="104.57" ry="29.33"></ellipse>
+<text text-anchor="middle" x="299.2" y="-105.62" font-family="Times,serif" font-size="14.00">Package D</text>
+<text text-anchor="middle" x="299.2" y="-88.82" font-family="Times,serif" font-size="14.00">System library required</text>
+</g>
+<!-- B&#45;&gt;D -->
+<g id="edge3" class="edge">
+<title>B-&gt;D</title>
+<path fill="none" stroke="black" d="M213.64,-168.13C225.72,-158.85 241.48,-146.74 256.19,-135.45"></path>
+<polygon fill="black" stroke="black" points="258.42,-138.15 264.22,-129.29 254.15,-132.6 258.42,-138.15"></polygon>
+</g>
+<!-- E -->
+<g id="node5" class="node">
+<title>E</title>
+<ellipse fill="none" stroke="black" cx="299.2" cy="-18" rx="121.53" ry="18"></ellipse>
+<text text-anchor="middle" x="299.2" y="-13.8" font-family="Times,serif" font-size="14.00">External system dependency</text>
+</g>
+<!-- D&#45;&gt;E -->
+<g id="edge4" class="edge">
+<title>D-&gt;E</title>
+<path fill="none" stroke="black" d="M299.2,-71.94C299.2,-63.65 299.2,-54.61 299.2,-46.39"></path>
+<polygon fill="black" stroke="black" points="302.7,-46.19 299.2,-36.19 295.7,-46.19 302.7,-46.19"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>For example:</p>
+<ul>
+<li>A downstream package may require compilation with C/C++</li>
+<li>Another package may use <code>LinkingTo</code> and depend on C/C++ headers from other packages</li>
+<li>Another dependency may require external system libraries</li>
+<li>Another may require a platform-specific build toolchain. On Windows, for example, a downstream dependency that needs compilation may require Rtools, and the required Rtools version depends on the version of R being used.</li>
+<li>Another may depend on Python through packages like <code>reticulate</code></li>
+</ul>
+<p>A package that looked simple can suddenly require a compiler toolchain, C/C++ headers, external runtimes, system libraries, OS-specific tooling, or version-specific build environments.</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 370.46 332.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 328)">
+<title>external_tooling</title>
+<!-- A -->
+<g id="node1" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="178.27" cy="-306" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="178.27" y="-301.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- B -->
+<g id="node2" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="178.27" cy="-234" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="178.27" y="-229.8" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- A&#45;&gt;B -->
+<g id="edge1" class="edge">
+<title>A-&gt;B</title>
+<path fill="none" stroke="black" d="M178.27,-287.7C178.27,-279.98 178.27,-270.71 178.27,-262.11"></path>
+<polygon fill="black" stroke="black" points="181.77,-262.1 178.27,-252.1 174.77,-262.1 181.77,-262.1"></polygon>
+</g>
+<!-- C -->
+<g id="node3" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="102.27" cy="-162" rx="46.92" ry="18"></ellipse>
+<text text-anchor="middle" x="102.27" y="-157.8" font-family="Times,serif" font-size="14.00">reticulate</text>
+</g>
+<!-- B&#45;&gt;C -->
+<g id="edge2" class="edge">
+<title>B-&gt;C</title>
+<path fill="none" stroke="black" d="M160.64,-216.76C150.69,-207.6 138.09,-196 127.15,-185.92"></path>
+<polygon fill="black" stroke="black" points="129.26,-183.11 119.53,-178.91 124.52,-188.26 129.26,-183.11"></polygon>
+</g>
+<!-- E -->
+<g id="node5" class="node">
+<title>E</title>
+<ellipse fill="none" stroke="black" cx="255.27" cy="-162" rx="51.54" ry="18"></ellipse>
+<text text-anchor="middle" x="255.27" y="-157.8" font-family="Times,serif" font-size="14.00">Package E</text>
+</g>
+<!-- B&#45;&gt;E -->
+<g id="edge4" class="edge">
+<title>B-&gt;E</title>
+<path fill="none" stroke="black" d="M196.12,-216.76C206.13,-207.66 218.79,-196.16 229.82,-186.13"></path>
+<polygon fill="black" stroke="black" points="232.46,-188.46 237.5,-179.15 227.75,-183.28 232.46,-188.46"></polygon>
+</g>
+<!-- D -->
+<g id="node4" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="84.27" cy="-90" rx="84.03" ry="18"></ellipse>
+<text text-anchor="middle" x="84.27" y="-85.8" font-family="Times,serif" font-size="14.00">Python Installation</text>
+</g>
+<!-- C&#45;&gt;D -->
+<g id="edge3" class="edge">
+<title>C-&gt;D</title>
+<path fill="none" stroke="black" d="M97.91,-144.05C95.9,-136.26 93.48,-126.82 91.23,-118.08"></path>
+<polygon fill="black" stroke="black" points="94.59,-117.09 88.71,-108.28 87.81,-118.83 94.59,-117.09"></polygon>
+</g>
+<!-- F -->
+<g id="node6" class="node">
+<title>F</title>
+<ellipse fill="none" stroke="black" cx="274.27" cy="-90" rx="88.39" ry="18"></ellipse>
+<text text-anchor="middle" x="274.27" y="-85.8" font-family="Times,serif" font-size="14.00">C/C++ Compilation</text>
+</g>
+<!-- E&#45;&gt;F -->
+<g id="edge5" class="edge">
+<title>E-&gt;F</title>
+<path fill="none" stroke="black" d="M259.86,-144.05C261.98,-136.26 264.54,-126.82 266.92,-118.08"></path>
+<polygon fill="black" stroke="black" points="270.33,-118.84 269.58,-108.28 263.58,-117.01 270.33,-118.84"></polygon>
+</g>
+<!-- G -->
+<g id="node7" class="node">
+<title>G</title>
+<ellipse fill="none" stroke="black" cx="274.27" cy="-18" rx="87.52" ry="18"></ellipse>
+<text text-anchor="middle" x="274.27" y="-13.8" font-family="Times,serif" font-size="14.00">Rtools on Windows</text>
+</g>
+<!-- F&#45;&gt;G -->
+<g id="edge6" class="edge">
+<title>F-&gt;G</title>
+<path fill="none" stroke="black" d="M274.27,-71.7C274.27,-63.98 274.27,-54.71 274.27,-46.11"></path>
+<polygon fill="black" stroke="black" points="277.77,-46.1 274.27,-36.1 270.77,-46.1 277.77,-46.1"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The complexity was always there — it was simply hidden downstream.</p>
+</section>
+<section id="why-dependency-graphs-matter" class="level1">
+<h1>Why Dependency Graphs Matter</h1>
+<p>This is precisely where dependency graphs become valuable.</p>
+<p>A dependency graph transforms package dependencies from a hidden recursive structure into something visible and understandable.</p>
+<p>Instead of seeing only this:</p>
+<pre class="text"><code>Imports:
+  Package A,
+  Package B,
+  Package C</code></pre>
+<p>You can see this:</p>
+<div class="cell" data-eval="true" data-layout-align="center">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<svg width="672" height="480" viewbox="0.00 0.00 553.36 260.00" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="; max-width: none; max-height: none">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 256)">
+<title>full_dependency_graph</title>
+<!-- P -->
+<g id="node1" class="node">
+<title>P</title>
+<ellipse fill="none" stroke="black" cx="296.6" cy="-234" rx="65.44" ry="18"></ellipse>
+<text text-anchor="middle" x="296.6" y="-229.8" font-family="Times,serif" font-size="14.00">Your Package</text>
+</g>
+<!-- A -->
+<g id="node2" class="node">
+<title>A</title>
+<ellipse fill="none" stroke="black" cx="173.6" cy="-162" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="173.6" y="-157.8" font-family="Times,serif" font-size="14.00">Package A</text>
+</g>
+<!-- P&#45;&gt;A -->
+<g id="edge1" class="edge">
+<title>P-&gt;A</title>
+<path fill="none" stroke="black" d="M269.3,-217.46C251.34,-207.24 227.67,-193.77 208.36,-182.78"></path>
+<polygon fill="black" stroke="black" points="209.98,-179.68 199.56,-177.77 206.52,-185.76 209.98,-179.68"></polygon>
+</g>
+<!-- B -->
+<g id="node3" class="node">
+<title>B</title>
+<ellipse fill="none" stroke="black" cx="296.6" cy="-162" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="296.6" y="-157.8" font-family="Times,serif" font-size="14.00">Package B</text>
+</g>
+<!-- P&#45;&gt;B -->
+<g id="edge2" class="edge">
+<title>P-&gt;B</title>
+<path fill="none" stroke="black" d="M296.6,-215.7C296.6,-207.98 296.6,-198.71 296.6,-190.11"></path>
+<polygon fill="black" stroke="black" points="300.1,-190.1 296.6,-180.1 293.1,-190.1 300.1,-190.1"></polygon>
+</g>
+<!-- C -->
+<g id="node4" class="node">
+<title>C</title>
+<ellipse fill="none" stroke="black" cx="428.6" cy="-162" rx="52.13" ry="18"></ellipse>
+<text text-anchor="middle" x="428.6" y="-157.8" font-family="Times,serif" font-size="14.00">Package C</text>
+</g>
+<!-- P&#45;&gt;C -->
+<g id="edge3" class="edge">
+<title>P-&gt;C</title>
+<path fill="none" stroke="black" d="M325.24,-217.81C344.92,-207.37 371.22,-193.43 392.36,-182.22"></path>
+<polygon fill="black" stroke="black" points="394.17,-185.22 401.36,-177.44 390.89,-179.03 394.17,-185.22"></polygon>
+</g>
+<!-- D -->
+<g id="node5" class="node">
+<title>D</title>
+<ellipse fill="none" stroke="black" cx="52.6" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="52.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package D</text>
+</g>
+<!-- A&#45;&gt;D -->
+<g id="edge4" class="edge">
+<title>A-&gt;D</title>
+<path fill="none" stroke="black" d="M147.94,-146.15C130.21,-135.9 106.43,-122.14 87.05,-110.93"></path>
+<polygon fill="black" stroke="black" points="88.63,-107.8 78.22,-105.82 85.12,-113.86 88.63,-107.8"></polygon>
+</g>
+<!-- E -->
+<g id="node6" class="node">
+<title>E</title>
+<ellipse fill="none" stroke="black" cx="174.6" cy="-90" rx="51.54" ry="18"></ellipse>
+<text text-anchor="middle" x="174.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package E</text>
+</g>
+<!-- A&#45;&gt;E -->
+<g id="edge5" class="edge">
+<title>A-&gt;E</title>
+<path fill="none" stroke="black" d="M173.84,-143.7C173.95,-135.98 174.09,-126.71 174.21,-118.11"></path>
+<polygon fill="black" stroke="black" points="177.71,-118.15 174.35,-108.1 170.71,-118.05 177.71,-118.15"></polygon>
+</g>
+<!-- F -->
+<g id="node7" class="node">
+<title>F</title>
+<ellipse fill="none" stroke="black" cx="296.6" cy="-90" rx="50.99" ry="18"></ellipse>
+<text text-anchor="middle" x="296.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package F</text>
+</g>
+<!-- B&#45;&gt;F -->
+<g id="edge6" class="edge">
+<title>B-&gt;F</title>
+<path fill="none" stroke="black" d="M296.6,-143.7C296.6,-135.98 296.6,-126.71 296.6,-118.11"></path>
+<polygon fill="black" stroke="black" points="300.1,-118.1 296.6,-108.1 293.1,-118.1 300.1,-118.1"></polygon>
+</g>
+<!-- H -->
+<g id="node9" class="node">
+<title>H</title>
+<ellipse fill="none" stroke="black" cx="448.6" cy="-90" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="448.6" y="-85.8" font-family="Times,serif" font-size="14.00">Package H</text>
+</g>
+<!-- C&#45;&gt;H -->
+<g id="edge8" class="edge">
+<title>C-&gt;H</title>
+<path fill="none" stroke="black" d="M433.44,-144.05C435.67,-136.26 438.36,-126.82 440.86,-118.08"></path>
+<polygon fill="black" stroke="black" points="444.28,-118.85 443.66,-108.28 437.55,-116.93 444.28,-118.85"></polygon>
+</g>
+<!-- G -->
+<g id="node8" class="node">
+<title>G</title>
+<ellipse fill="none" stroke="black" cx="291.6" cy="-18" rx="52.69" ry="18"></ellipse>
+<text text-anchor="middle" x="291.6" y="-13.8" font-family="Times,serif" font-size="14.00">Package G</text>
+</g>
+<!-- F&#45;&gt;G -->
+<g id="edge7" class="edge">
+<title>F-&gt;G</title>
+<path fill="none" stroke="black" d="M295.36,-71.7C294.81,-63.98 294.15,-54.71 293.53,-46.11"></path>
+<polygon fill="black" stroke="black" points="297.02,-45.83 292.82,-36.1 290.04,-46.33 297.02,-45.83"></polygon>
+</g>
+<!-- I -->
+<g id="node10" class="node">
+<title>I</title>
+<ellipse fill="none" stroke="black" cx="453.6" cy="-18" rx="91.54" ry="18"></ellipse>
+<text text-anchor="middle" x="453.6" y="-13.8" font-family="Times,serif" font-size="14.00">System Requirement</text>
+</g>
+<!-- H&#45;&gt;I -->
+<g id="edge9" class="edge">
+<title>H-&gt;I</title>
+<path fill="none" stroke="black" d="M449.83,-71.7C450.38,-63.98 451.05,-54.71 451.66,-46.11"></path>
+<polygon fill="black" stroke="black" points="455.15,-46.33 452.38,-36.1 448.17,-45.83 455.15,-46.33"></polygon>
+</g>
+</g>
+</svg>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Now you can identify:</p>
+<ul>
+<li>Which packages introduce the largest dependency footprint</li>
+<li>Which packages introduce compilation requirements</li>
+<li>Which dependencies are indirect vs direct</li>
+<li>How dependency depth changes over time</li>
+<li>Which packages pull in system-level complexity</li>
+<li>How version requirements propagate across the graph</li>
+</ul>
+<p>For package developers, this is especially important. Understanding your package’s dependency footprint is part of understanding the package you are asking users to install. A package may look small from the perspective of its own <code>DESCRIPTION</code> file, but users experience the full dependency graph, not only the direct dependencies you declared.</p>
+<p>This matters when making design decisions. If two packages solve a similar problem, but one introduces a much larger dependency chain, that difference may affect installation time, portability, reproducibility, and long-term maintenance. Dependency graphs make those trade-offs visible.</p>
+<p>They are also useful when containerising an R project. A container image needs to include not only your R code and R packages, but also the system requirements needed by packages anywhere in the dependency graph. If those system libraries, compilers, external runtimes, or platform-level tools are missing from the image, the project may fail to install or run even though the direct dependencies in <code>DESCRIPTION</code> look simple.</p>
+<p>Most importantly, it helps answer a critical question:</p>
+<blockquote class="blockquote">
+<p>What does my package <em>actually</em> depend on?</p>
+</blockquote>
+<p>That answer is often much larger and more complex than what appears in a <code>DESCRIPTION</code> file.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>Modern software ecosystems are deeply interconnected, and R packages are no exception.</p>
+<p>A <code>DESCRIPTION</code> file provides an important view of a package’s declared dependencies, but it does not fully capture the true dependency landscape. Version requirements, indirect dependencies, compilation requirements, and system-level tooling can all propagate through downstream packages in ways that are not immediately visible.</p>
+<p>Understanding package dependencies therefore requires thinking in terms of <em>graphs</em>, not lists.</p>
+<p>That is exactly the problem my dependency visualization tool aims to solve: making hidden dependency chains visible so developers can better understand the real complexity behind the packages they use.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const toc = document.querySelector('nav.toc-active[role="doc-toc"]');
+  if (!toc) return;
+
+  const links = Array.from(toc.querySelectorAll("a[data-scroll-target]"));
+  const entries = links
+    .map((link) => {
+      const target = link.getAttribute("data-scroll-target");
+      const id = target && target.startsWith("#") ? decodeURIComponent(target.slice(1)) : null;
+      const section = id ? document.getElementById(id) : null;
+      return section ? { link, section } : null;
+    })
+    .filter(Boolean);
+
+  if (!entries.length) return;
+
+  const updateActiveToc = () => {
+    const activationLine = 160;
+    let current = entries[0];
+
+    for (const entry of entries) {
+      if (entry.section.getBoundingClientRect().top <= activationLine) {
+        current = entry;
+      } else {
+        break;
+      }
+    }
+
+    links.forEach((link) => link.classList.toggle("active", link === current.link));
+
+    let parent = current.link.parentElement;
+    while (parent && parent !== toc) {
+      if (parent.tagName === "UL") {
+        parent.classList.remove("collapse");
+      }
+      parent = parent.parentElement;
+    }
+  };
+
+  updateActiveToc();
+  document.addEventListener("scroll", updateActiveToc, { passive: true });
+  window.addEventListener("resize", updateActiveToc);
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/ankonyeni\.github\.io\/notes-from-athi");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

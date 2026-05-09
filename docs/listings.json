@@ -1,14 +1,16 @@
 [
   {
-    "listing": "/index.html",
+    "listing": "/archive.html",
     "items": [
+      "/posts/package-dependency/index.html",
       "/posts/argument-matching/index.html",
       "/posts/bind-pipe/index.html"
     ]
   },
   {
-    "listing": "/archive.html",
+    "listing": "/index.html",
     "items": [
+      "/posts/package-dependency/index.html",
       "/posts/argument-matching/index.html",
       "/posts/bind-pipe/index.html"
     ]

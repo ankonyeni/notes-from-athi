@@ -3,6 +3,7 @@ project:
   output-dir: docs
   render:
     - "*.qmd"
+    - "posts/**/*.qmd"
     - "!r.qmd"
 
 execute:
@@ -10,6 +11,8 @@ execute:
   eval: false     # do not run code globally
   warning: false
   message: false
+  env:
+    GRAPHVIZ_DOT: "C:/Program Files/Graphviz/bin/dot.exe"
 
 website:
   description: "Notes on R, Python, programming, data standards, digital transformation, clinical trials, statistics, data visualization, and related ideas."

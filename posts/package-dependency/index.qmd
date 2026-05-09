@@ -1,0 +1,503 @@
+---
+title: "Seeing Beyond `DESCRIPTION`"
+subtitle: "The Hidden Complexity of R Package Dependencies"
+description: "Exploring the hidden complexity of R package dependencies, indirect dependencies, version requirements, system requirements, and why dependency graphs matter."
+date: "2026-05-09"
+categories: [R, Programming]
+image: "image.png"
+title-block-banner: "image.png"
+title-block-banner-color: "#fff8e8"
+---
+
+## Introduction
+
+### TL;DR
+
+The `DESCRIPTION` file shows the surface of your dependencies, not the full structure beneath it. To make that hidden structure easier to explore, I created [pkgmap.app](https://pkgmap.app), a web application for visualising the full dependency graph behind an R package.
+
+The goal is simple: instead of seeing only the packages listed directly in `DESCRIPTION`, you can see the wider dependency chain, including indirect dependencies, version requirements, compilation requirements, and system-level complexity.
+
+The `DESCRIPTION` file shows the surface of your dependencies, not the full structure beneath it.
+
+When we think about package dependencies in R, we often think about the packages listed in the `Imports`, `Depends`, or `Suggests` fields of a `DESCRIPTION` file. At first glance, it feels straightforward: these are the packages my package depends on.
+
+But that view is incomplete.
+
+In reality, package dependencies form a graph, not a flat list.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+
+digraph dependencies {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  A [label="Your Package"];
+  B [label="Package B"];
+  C [label="Package C"];
+  D [label="Package D"];
+  E [label="Package E"];
+  F [label="Package F"];
+  G [label="Package G"];
+
+  A -> B;
+  A -> C;
+  B -> D;
+  B -> E;
+  C -> F;
+  F -> G;
+}
+```
+
+Every package you depend on has its own dependencies, and those dependencies may have dependencies of their own. What appears to be a small and lightweight package at the surface can ultimately pull in a surprisingly large dependency chain with additional version requirements, compilation requirements, system libraries, and external tooling.
+
+This realization is what motivated me to build a web application for exploring package dependency graphs. Rather than showing only direct dependencies, the tool visualizes the *entire dependency chain*, making it easier to understand what a package truly depends on.
+
+
+# Losing Control of Your Package’s Dependency Footprint
+
+One of the most important and often overlooked realities of package development is this:
+
+> The moment you declare a dependency on another package, you partially lose control over your package’s overall dependency footprint.
+
+At first, this may sound unintuitive. After all, *you* are the one deciding which packages to include in your `DESCRIPTION` file.
+
+But that control only applies to the dependency decision you make today. It does not fully control what that dependency may become tomorrow.
+
+Suppose your package depends on only one package, and that package currently has no dependencies of its own.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph simple_dependency_today {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  A [label="Your Package"];
+  B [label="Package B\nNo dependencies today"];
+
+  A -> B;
+}
+```
+
+At this point, the dependency structure looks simple. But that simplicity is not something you completely control. It depends on the future decisions of `Package B`’s maintainer.
+
+If the maintainer later adds new dependencies, introduces compiled code, raises the minimum R version, or adds system requirements, your package inherits those consequences.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph simple_dependency_tomorrow {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  A [label="Your Package"];
+  B [label="Package B"];
+  C [label="Package C\nAdded later"];
+  D [label="System Requirement\nAdded later"];
+
+  A -> B;
+  B -> C;
+  B -> D;
+}
+```
+
+Your package did not change, but its dependency footprint did.
+
+This is why dependency chains should be treated as dynamic rather than fixed. Even when your dependency graph is shallow today, it is not guaranteed to remain shallow tomorrow.
+
+The moment your package depends on another package, you also inherit the architectural decisions made by that package and its future dependency choices.
+
+This means another package maintainer can indirectly change the complexity of *your* package without you modifying a single line of code.
+
+This creates an important distinction between:
+
+* The dependencies you *explicitly chose*
+* The dependencies your package *effectively inherits*
+
+Those two things are not the same.
+
+
+
+# Not All Direct Dependencies Have the Same Weight
+
+A `DESCRIPTION` file also hides an important asymmetry: your direct dependencies do not all have the same impact on your overall dependency footprint.
+
+When you look at a `DESCRIPTION` file, each dependency appears as just another package name in a list:
+
+```text
+Imports:
+  Package A,
+  Package B,
+  Package C
+```
+
+But those package names can represent very different levels of downstream complexity.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+//| fig-height: 4
+digraph dependency_weight {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  P [label="Your Package"];
+  A [label="Package A"];
+  B [label="Package B"];
+  C [label="Package C"];
+  D [label="Package D"];
+  E [label="Package E"];
+  F [label="Package F"];
+  G [label="Package G"];
+  H [label="Package H"];
+  I [label="Package I"];
+  J [label="Package J"];
+
+  P -> A;
+  P -> B;
+  P -> C;
+  A -> D;
+  A -> E;
+  A -> F;
+  B -> E;
+  B -> F;
+  C -> G;
+  C -> H;
+  C -> I;
+  C -> J;
+}
+```
+
+Package A, Package B, and Package C are all direct dependencies, but they do not carry the same weight.
+
+Some packages bring along many additional dependencies that are unique to them. Others may depend mostly on packages that are already present elsewhere in the dependency graph.
+
+That distinction matters.
+
+If Package C introduces several dependencies that no other package needs, then adding Package C meaningfully increases your package’s dependency footprint. But if Package B depends mostly on packages already pulled in by Package A, then its marginal impact may be much smaller.
+
+In other words, the cost of a dependency is not only whether it appears in your `DESCRIPTION` file. The real cost is how much new dependency structure it adds to the full graph.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph marginal_dependency_cost {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  P [label="Your Package"];
+  A [label="Package A"];
+  B [label="Package B"];
+  D [label="Shared Dependency"];
+  E [label="Shared Dependency"];
+  F [label="Unique Dependency"];
+
+  P -> A;
+  P -> B;
+
+  A -> D;
+  A -> E;
+
+  B -> D;
+  B -> E;
+  B -> F;
+}
+```
+
+This is why two packages can both appear as one line in `DESCRIPTION`, yet have very different effects on installation time, reproducibility, platform requirements, and maintenance risk.
+
+A flat dependency list treats every direct dependency as if it has the same weight. A dependency graph shows that they do not.
+
+# The Hidden Depth of Version Requirements
+
+Version requirements are not only what *you* declare. They are what your full dependency graph can support.
+
+This is an easy detail to miss because the `DESCRIPTION` file gives a very local view of your package. It tells you what *your package* claims to need directly, but it does not necessarily tell you the strongest requirement imposed by everything your package depends on indirectly.
+
+For example, suppose your package declares:
+
+```text
+Depends: R (>= 3.5.0)
+```
+
+At first glance, that seems clear. Your package requires R 3.5.0 or later. But that statement is only true if the rest of the dependency graph can also run on R 3.5.0.
+
+Now suppose your package depends on `Package B`, and `Package B` depends on `Package C`. If `Package C` requires R 4.1.0, then R 3.5.0 is no longer sufficient for your package to be installed and used successfully.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph downstream_r_requirement {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  A [label="Your Package\nR >= 3.5.0"];
+  B [label="Package B"];
+  C [label="Package C\nR >= 4.1.0"];
+
+  A -> B;
+  B -> C;
+}
+```
+
+Your package code did not change. Your `DESCRIPTION` file did not change. Your declared minimum R version is still `R >= 3.5.0`.
+
+But your *effective* minimum R version has changed because the dependency graph contains a stricter requirement downstream.
+
+This is the important distinction:
+
+Your declared requirement is what your package says directly.
+
+Your effective requirement is what the entire dependency graph needs in order to work.
+
+Those two values can be different.
+
+This can happen for many reasons. A downstream package maintainer may adopt newer language features, rely on newer runtime behavior, simplify their maintenance burden by dropping support for older R versions, or raise their minimum version for compatibility with other dependencies.
+
+New syntax is a simple example. A downstream package may decide to use the native R pipe operator, `|>`, which requires R 4.1.0. Another package may use the placeholder `_` in native pipe expressions, which requires R 4.2.0. Even if your own code does not use either feature, your package can still inherit the requirement because one of your dependencies does.
+
+So the real question is not only:
+
+> What minimum R version does my package declare?
+
+The better question is:
+
+> What minimum R version is required by the full dependency graph?
+
+That is why looking only at the top-level `DESCRIPTION` file can be misleading. The declared requirement may describe your package in isolation, but packages are rarely installed in isolation. They are installed together with every dependency needed to make them work.
+
+So even when your own `DESCRIPTION` says `R >= 3.5.0`, the actual floor may be higher. The effective minimum version is determined by the strictest requirement anywhere in the dependency graph.
+
+> A package’s effective requirements are determined by the entire dependency chain, not just the package itself.
+
+# Direct vs. Indirect Dependencies
+
+Another common misconception is that removing a direct dependency necessarily reduces the dependency complexity of a package.
+
+Suppose your package directly depends on both Package A and Package C:
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph direct_and_indirect {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  P [label="Your Package"];
+  A [label="Package A"];
+  C [label="Package C"];
+
+  P -> A;
+  P -> C;
+  A -> C;
+}
+```
+
+Now imagine you remove Package C from your own direct dependencies.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph indirect_only {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  P [label="Your Package"];
+  A [label="Package A"];
+  C [label="Package C"];
+
+  P -> A;
+  A -> C;
+}
+```
+
+At first glance, it seems like your dependency footprint has been reduced.
+
+But Package C is still part of your dependency graph because Package A still depends on it.
+
+The package did not disappear — its position in the graph simply changed.
+
+Instead of being a direct dependency, it became an indirect dependency.
+
+This is why looking only at `DESCRIPTION` can be misleading. A dependency graph makes the difference immediately visible.
+
+
+
+# System Requirements and Compilation Complexity
+
+Your package itself may:
+
+* Contain no compiled code
+* Have no system requirements
+* Require no external runtimes
+* Appear completely platform-independent
+
+Yet your package can still inherit those complexities from downstream dependencies.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph system_requirements {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  A [label="Your Package\nNo compiled code"];
+  B [label="Package B"];
+  C [label="Package C\nC/C++ compilation"];
+  D [label="Package D\nSystem library required"];
+  E [label="External system dependency"];
+
+  A -> B;
+  B -> C;
+  B -> D;
+  D -> E;
+}
+```
+
+For example:
+
+* A downstream package may require compilation with C/C++
+* Another package may use `LinkingTo` and depend on C/C++ headers from other packages
+* Another dependency may require external system libraries
+* Another may require a platform-specific build toolchain. On Windows, for example, a downstream dependency that needs compilation may require Rtools, and the required Rtools version depends on the version of R being used.
+* Another may depend on Python through packages like `reticulate`
+
+A package that looked simple can suddenly require a compiler toolchain, C/C++ headers, external runtimes, system libraries, OS-specific tooling, or version-specific build environments.
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph external_tooling {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  A [label="Your Package"];
+  B [label="Package B"];
+  C [label="reticulate"];
+  D [label="Python Installation"];
+  E [label="Package E"];
+  F [label="C/C++ Compilation"];
+  G [label="Rtools on Windows"];
+
+  A -> B;
+  B -> C;
+  C -> D;
+
+  B -> E;
+  E -> F;
+  F -> G;
+}
+```
+
+The complexity was always there — it was simply hidden downstream.
+
+
+
+# Why Dependency Graphs Matter
+
+This is precisely where dependency graphs become valuable.
+
+A dependency graph transforms package dependencies from a hidden recursive structure into something visible and understandable.
+
+Instead of seeing only this:
+
+```text
+Imports:
+  Package A,
+  Package B,
+  Package C
+```
+
+You can see this:
+
+```{dot}
+//| eval: true
+//| echo: false
+//| fig-align: center
+digraph full_dependency_graph {
+  bgcolor="transparent";
+  rankdir=TB;
+
+  P [label="Your Package"];
+  A [label="Package A"];
+  B [label="Package B"];
+  C [label="Package C"];
+  D [label="Package D"];
+  E [label="Package E"];
+  F [label="Package F"];
+  G [label="Package G"];
+  H [label="Package H"];
+  I [label="System Requirement"];
+
+  P -> A;
+  P -> B;
+  P -> C;
+
+  A -> D;
+  A -> E;
+
+  B -> F;
+  F -> G;
+
+  C -> H;
+  H -> I;
+}
+```
+
+Now you can identify:
+
+* Which packages introduce the largest dependency footprint
+* Which packages introduce compilation requirements
+* Which dependencies are indirect vs direct
+* How dependency depth changes over time
+* Which packages pull in system-level complexity
+* How version requirements propagate across the graph
+
+For package developers, this is especially important. Understanding your package’s dependency footprint is part of understanding the package you are asking users to install. A package may look small from the perspective of its own `DESCRIPTION` file, but users experience the full dependency graph, not only the direct dependencies you declared.
+
+This matters when making design decisions. If two packages solve a similar problem, but one introduces a much larger dependency chain, that difference may affect installation time, portability, reproducibility, and long-term maintenance. Dependency graphs make those trade-offs visible.
+
+They are also useful when containerising an R project. A container image needs to include not only your R code and R packages, but also the system requirements needed by packages anywhere in the dependency graph. If those system libraries, compilers, external runtimes, or platform-level tools are missing from the image, the project may fail to install or run even though the direct dependencies in `DESCRIPTION` look simple.
+
+Most importantly, it helps answer a critical question:
+
+> What does my package *actually* depend on?
+
+That answer is often much larger and more complex than what appears in a `DESCRIPTION` file.
+
+
+# Conclusion
+
+Modern software ecosystems are deeply interconnected, and R packages are no exception.
+
+A `DESCRIPTION` file provides an important view of a package’s declared dependencies, but it does not fully capture the true dependency landscape. Version requirements, indirect dependencies, compilation requirements, and system-level tooling can all propagate through downstream packages in ways that are not immediately visible.
+
+Understanding package dependencies therefore requires thinking in terms of *graphs*, not lists.
+
+That is exactly the problem my dependency visualization tool aims to solve: making hidden dependency chains visible so developers can better understand the real complexity behind the packages they use.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
