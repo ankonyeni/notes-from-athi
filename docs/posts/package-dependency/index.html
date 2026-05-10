@@ -226,7 +226,7 @@ background-size: cover;
 <p>The <code>DESCRIPTION</code> file shows the surface of your dependencies, not the full structure beneath it. To make that hidden structure easier to explore, I created <a href="https://pkgmap.app">pkgmap.app</a>, a web application for visualising the full dependency graph behind an R package.</p>
 <p>The goal is simple: instead of seeing only the packages listed directly in <code>DESCRIPTION</code>, you can see the wider dependency chain, including indirect dependencies, version requirements, compilation requirements, and system-level complexity.</p>
 <p>The <code>DESCRIPTION</code> file shows the surface of your dependencies, not the full structure beneath it.</p>
-<p>When we think about package dependencies in R, we often think about the packages listed in the <code>Imports</code>, <code>Depends</code>, or <code>Suggests</code> fields of a <code>DESCRIPTION</code> file. At first glance, it feels straightforward: these are the packages my package depends on.</p>
+<p>When we think about package dependencies in R, we often think about the packages listed in the <code>Imports</code>, <code>Depends</code>, or <code>LinkingTo</code> fields of a <code>DESCRIPTION</code> file. At first glance, it feels straightforward: these are the packages my package depends on.</p>
 <p>But that view is incomplete.</p>
 <p>In reality, package dependencies form a graph, not a flat list.</p>
 <div class="cell" data-eval="true" data-layout-align="center">
