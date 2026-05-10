@@ -19,7 +19,7 @@ The goal is simple: instead of seeing only the packages listed directly in `DESC
 
 The `DESCRIPTION` file shows the surface of your dependencies, not the full structure beneath it.
 
-When we think about package dependencies in R, we often think about the packages listed in the `Imports`, `Depends`, or `Suggests` fields of a `DESCRIPTION` file. At first glance, it feels straightforward: these are the packages my package depends on.
+When we think about package dependencies in R, we often think about the packages listed in the `Imports`, `Depends`, or `LinkingTo` fields of a `DESCRIPTION` file. At first glance, it feels straightforward: these are the packages my package depends on.
 
 But that view is incomplete.
 
